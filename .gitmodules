@@ -1,0 +1,6 @@
+[submodule "cpplox/spdlog"]
+	path = cpplox/spdlog
+	url = git@github.com:gabime/spdlog.git
+[submodule "cpplox/magic_enum"]
+	path = cpplox/magic_enum
+	url = git@github.com:Neargye/magic_enum.git
