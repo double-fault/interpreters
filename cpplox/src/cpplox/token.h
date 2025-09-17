@@ -1,9 +1,8 @@
 #pragma once
 
-#include <string>
-#include <string_view>
-#include <optional>
 #include <map>
+#include <optional>
+#include <string>
 
 namespace cpplox {
 
@@ -13,21 +12,50 @@ public:
         kError = 0,
 
         // single-character tokens
-        kLeftParen, kRightParen, kLeftBrace, kRightBrace,
-        kComma, kDot, kMinus, kPlus, kSemicolon, kSlash, kStar,
+        kLeftParen,
+        kRightParen,
+        kLeftBrace,
+        kRightBrace,
+        kComma,
+        kDot,
+        kMinus,
+        kPlus,
+        kSemicolon,
+        kSlash,
+        kStar,
 
         // one or two character tokens
-        kBang, kBangEqual, 
-        kEqual, kEqualEqual,
-        kGreater, kGreaterEqual,
-        kLess, kLessEqual,
+        kBang,
+        kBangEqual,
+        kEqual,
+        kEqualEqual,
+        kGreater,
+        kGreaterEqual,
+        kLess,
+        kLessEqual,
 
         // literals
-        kIdentifier, kString, kNumber,
+        kIdentifier,
+        kString,
+        kNumber,
 
         // keywords
-        kAnd, kClass, kElse, kFalse, kFun, kFor, kIf, kNil, kOr,
-        kPrint, kReturn, kSuper, kThis, kTrue, kVar, kWhile,
+        kAnd,
+        kClass,
+        kElse,
+        kFalse,
+        kFun,
+        kFor,
+        kIf,
+        kNil,
+        kOr,
+        kPrint,
+        kReturn,
+        kSuper,
+        kThis,
+        kTrue,
+        kVar,
+        kWhile,
 
         kEof
     };
@@ -57,16 +85,15 @@ public:
         { "while", Type::kWhile }
     };
 
-    Token(Type type, const std::string& lexeme, int line, std::optional<Literal> literal); 
+    Token(Type type, const std::string& lexeme, int line, std::optional<Literal> literal);
 
-    friend std::ostream& operator<< (std::ostream& out, const Token& token);
+    friend std::ostream& operator<<(std::ostream& out, const Token& token);
 
 private:
     const Type mType;
     const std::string mLexeme;
     const int mLine;
     std::optional<Literal> mLiteral;
-
 };
 
 }

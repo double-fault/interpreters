@@ -2,8 +2,6 @@
 
 #include "ierror_reporter.h"
 
-#include <iostream>
-
 namespace cpplox {
 
 class ErrorReporter final : public IErrorReporter {

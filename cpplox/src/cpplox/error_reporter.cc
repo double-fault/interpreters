@@ -1,5 +1,7 @@
 #include "error_reporter.h"
 
+#include <iostream>
+
 namespace cpplox {
 
 void ErrorReporter::Report(int line, std::string_view message)

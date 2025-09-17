@@ -1,4 +1,5 @@
 #include "runner.h"
+#include "scanner.h"
 
 #include <iostream>
 
@@ -9,12 +10,12 @@ Runner::Runner(IErrorReporter* errorReporter)
 {
 }
 
-void Runner::Run(std::string_view source) 
+void Runner::Run(std::string_view source)
 {
     Scanner scanner(source, mErrorReporter);
 
     std::vector<Token> tokens = scanner.ScanTokens();
-    for (auto &token: tokens) {
+    for (auto& token : tokens) {
         std::cout << token << "\n";
     }
 }

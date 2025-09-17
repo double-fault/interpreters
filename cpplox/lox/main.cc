@@ -1,25 +1,25 @@
-#include <runner.h>
 #include <error_reporter.h>
+#include <runner.h>
 
-#include <iostream>
-#include <memory>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <memory>
 
-std::string readFile(const char* path) 
+std::string readFile(const char* path)
 {
     return { std::istreambuf_iterator<char>(std::ifstream(path).rdbuf()),
-         std::istreambuf_iterator<char>() };
+        std::istreambuf_iterator<char>() };
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     if (argc > 2) {
         std::cerr << "Usage: lox [script]" << std::endl;
         return 0;
-    } 
+    }
 
-    std::unique_ptr<cpplox::IErrorReporter> errorReporter = 
-        std::make_unique<cpplox::ErrorReporter>();
+    std::unique_ptr<cpplox::IErrorReporter> errorReporter = std::make_unique<cpplox::ErrorReporter>();
     cpplox::Runner runner(errorReporter.get());
 
     if (argc == 2) {
