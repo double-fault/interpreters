@@ -8,6 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(spdlog)
 add_subdirectory(magic_enum)
 add_subdirectory(src/cpplox)
+add_subdirectory(googletest)
+add_subdirectory(tests)
 add_subdirectory(lox)
 
 add_custom_target(copy_compile_commands ALL

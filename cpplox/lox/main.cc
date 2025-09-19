@@ -1,5 +1,8 @@
+#include "spdlog/common.h"
 #include <error_reporter.h>
 #include <runner.h>
+
+#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <iostream>
@@ -18,6 +21,9 @@ int main(int argc, char** argv)
         std::cerr << "Usage: lox [script]" << std::endl;
         return 0;
     }
+
+    spdlog::set_level(spdlog::level::info);
+    spdlog::info("Cpplox starting");
 
     std::unique_ptr<cpplox::IErrorReporter> errorReporter = std::make_unique<cpplox::ErrorReporter>();
     cpplox::Runner runner(errorReporter.get());

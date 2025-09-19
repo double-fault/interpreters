@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ierror_reporter.h"
-#include "scanner.h"
 
 namespace cpplox {
 

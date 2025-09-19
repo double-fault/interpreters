@@ -89,7 +89,6 @@ public:
 
     friend std::ostream& operator<<(std::ostream& out, const Token& token);
 
-private:
     const Type mType;
     const std::string mLexeme;
     const int mLine;

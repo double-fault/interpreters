@@ -96,7 +96,7 @@ void Scanner::ScanToken()
     default:
         if (std::isdigit(character)) {
             ScanNumber();
-        } else if (std::isalpha(character)) {
+        } else if (std::isalpha(character) || character == '_') {
             ScanIdentifier();
         } else {
             mErrorReporter->Report(mLine, "[Scanner] Unexpected character.");
@@ -107,7 +107,7 @@ void Scanner::ScanToken()
 
 void Scanner::ScanIdentifier()
 {
-    while (std::isalpha(Peek()))
+    while (std::isalpha(Peek()) || Peek() == '_' || std::isdigit(Peek()))
         Next();
 
     Token::Type type = Token::Type::kIdentifier;
@@ -158,7 +158,7 @@ void Scanner::ScanNumber()
     }
 
     Token::Literal literal;
-    literal.mNumber = std::stod(mSource.substr(mLexemeStart + 1,
+    literal.mNumber = std::stod(mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart));
 
     AddToken(Token::Type::kNumber, literal);
