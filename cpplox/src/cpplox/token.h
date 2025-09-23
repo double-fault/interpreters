@@ -1,6 +1,6 @@
 #pragma once
 
-#include "literal.h"
+#include "object.h"
 
 #include <map>
 #include <optional>
@@ -81,14 +81,14 @@ public:
         { "while", Type::kWhile }
     };
 
-    Token(Type type, const std::string& lexeme, int line, std::optional<Literal> literal);
+    Token(Type type, const std::string& lexeme, int line, std::optional<Object> literal);
 
     friend std::ostream& operator<<(std::ostream& out, const Token& token);
 
     const Type mType;
     const std::string mLexeme;
     const int mLine;
-    std::optional<Literal> mLiteral;
+    std::optional<Object> mObject;
 };
 
 }

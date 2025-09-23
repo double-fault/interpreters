@@ -1,5 +1,6 @@
 #pragma once
 
+#include "object.h"
 #include "token.h"
 
 #include <memory>
@@ -11,7 +12,7 @@ class IExpressionVisitor;
 
 class ExpressionBinary;
 class ExpressionGrouping;
-class ExpressionLiteral;
+class ExpressionObject;
 class ExpressionUnary;
 
 class IExpression {
@@ -23,9 +24,10 @@ public:
 
 class IExpressionVisitor {
 public:
+    virtual void Visit(IExpression*) = 0;
     virtual void Visit(ExpressionBinary*) = 0;
     virtual void Visit(ExpressionGrouping*) = 0;
-    virtual void Visit(ExpressionLiteral*) = 0;
+    virtual void Visit(ExpressionObject*) = 0;
     virtual void Visit(ExpressionUnary*) = 0;
 
     virtual ~IExpressionVisitor() = default;
@@ -65,10 +67,10 @@ public:
     std::unique_ptr<IExpression> mExpression;
 };
 
-class ExpressionLiteral final : public IExpression {
+class ExpressionObject final : public IExpression {
 public:
-    ExpressionLiteral(std::unique_ptr<Literal> literal)
-        : mLiteral { std::move(literal) }
+    ExpressionObject(const Object& object)
+        : mObject { object }
     {
     }
 
@@ -77,7 +79,7 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Literal> mLiteral;
+    Object mObject;
 };
 
 class ExpressionUnary final : public IExpression {

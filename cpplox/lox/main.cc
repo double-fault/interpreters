@@ -22,7 +22,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
     spdlog::info("Cpplox starting");
 
     std::unique_ptr<cpplox::IErrorReporter> errorReporter = std::make_unique<cpplox::ErrorReporter>();

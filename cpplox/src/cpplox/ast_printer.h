@@ -6,9 +6,10 @@ namespace cpplox {
 
 class AstPrinter final : public IExpressionVisitor {
 public:
+    void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
     void Visit(ExpressionGrouping*) override;
-    void Visit(ExpressionLiteral*) override;
+    void Visit(ExpressionObject*) override;
     void Visit(ExpressionUnary*) override;
 
     std::string GetResult();

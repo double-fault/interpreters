@@ -3,6 +3,11 @@
 
 namespace cpplox {
 
+void AstPrinter::Visit(IExpression* expression)
+{
+    expression->Accept(this);
+}
+
 void AstPrinter::Visit(ExpressionBinary* binary)
 {
     ToString(binary->mLeft.get(), binary->mOperator->mLexeme, binary->mRight.get());
@@ -10,14 +15,14 @@ void AstPrinter::Visit(ExpressionBinary* binary)
 
 void AstPrinter::Visit(ExpressionGrouping* grouping)
 {
-    grouping->Accept(this);
+    grouping->mExpression->Accept(this);
     mResult = "(" + mResult + ")";
 }
 
-void AstPrinter::Visit(ExpressionLiteral* literal)
+void AstPrinter::Visit(ExpressionObject* object)
 {
     // TODO: Handle nil?
-    mResult = literal->mLiteral->ToString();
+    mResult = object->mObject.ToString();
 }
 
 void AstPrinter::Visit(ExpressionUnary* unary)
@@ -28,20 +33,25 @@ void AstPrinter::Visit(ExpressionUnary* unary)
 void AstPrinter::ToString(const std::string& str, IExpression* expr) 
 {
     expr->Accept(this);
-    mResult = str + mResult;
+    mResult = "(" + str + mResult + ")";
+}
+
+std::string AstPrinter::GetResult()
+{
+    return mResult;
 }
 
 void AstPrinter::ToString(IExpression* exprLeft, const std::string& str, IExpression* exprRight)
 {
-    std::string ret;
+    std::string ret { "(" };
 
     exprLeft->Accept(this);
-    ret = mResult + str;
+    ret += mResult + str;
 
     exprRight->Accept(this);
     ret += mResult;
 
-    mResult = ret;
+    mResult = ret + ")";
 }
 
 }

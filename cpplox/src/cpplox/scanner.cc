@@ -1,5 +1,5 @@
 #include "scanner.h"
-#include "literal.h"
+#include "object.h"
 #include "token.h"
 
 #include <cctype>
@@ -114,11 +114,11 @@ void Scanner::ScanIdentifier()
 
     Token::Type type = Token::Type::kIdentifier;
 
-    Literal literal;
+    Object literal;
     std::string identifier = mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart);
-    literal.mIdentifier = identifier;
-    literal.mType = Literal::Type::kIdentifier;
+    literal.mData = identifier;
+    literal.mType = Object::Type::kIdentifier;
 
     if (Token::kKeywordToType.find(identifier) != Token::kKeywordToType.end())
         type = Token::kKeywordToType.at(identifier);
@@ -141,10 +141,10 @@ void Scanner::ScanString()
 
     Next();
 
-    Literal literal;
-    literal.mString = mSource.substr(mLexemeStart + 1,
+    Object literal;
+    literal.mData = mSource.substr(mLexemeStart + 1,
         mCurrentCharacter - mLexemeStart - 2);
-    literal.mType = Literal::Type::kString;
+    literal.mType = Object::Type::kString;
 
     AddToken(Token::Type::kString, literal);
 }
@@ -161,15 +161,15 @@ void Scanner::ScanNumber()
             Next();
     }
 
-    Literal literal;
-    literal.mNumber = std::stod(mSource.substr(mLexemeStart,
+    Object literal;
+    literal.mData = std::stod(mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart));
-    literal.mType = Literal::Type::kNumber;
+    literal.mType = Object::Type::kNumber;
 
     AddToken(Token::Type::kNumber, literal);
 }
 
-void Scanner::AddToken(Token::Type type, std::optional<Literal> literal)
+void Scanner::AddToken(Token::Type type, std::optional<Object> literal)
 {
     mTokens.emplace_back(type, mSource.substr(mLexemeStart, mCurrentCharacter - mLexemeStart), mLine, literal);
 }

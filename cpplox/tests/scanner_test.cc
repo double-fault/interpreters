@@ -58,17 +58,17 @@ TEST_F(ScannerTest, NumberLiterals)
 
     for (int i = 0; i < 7; i++) {
         ASSERT_EQ(tokens[i].mType, Type::kNumber);
-        ASSERT_TRUE(tokens[i].mLiteral.has_value());
+        ASSERT_TRUE(tokens[i].mObject.has_value());
     }
     EXPECT_EQ(tokens[7].mType, Type::kEof);
 
-    EXPECT_NEAR(tokens[0].mLiteral->mNumber, 11.234, kEps);
-    EXPECT_NEAR(tokens[1].mLiteral->mNumber, 1.44123456, kEps);
-    EXPECT_NEAR(tokens[2].mLiteral->mNumber, 0, kEps);
-    EXPECT_NEAR(tokens[3].mLiteral->mNumber, 0, kEps);
-    EXPECT_NEAR(tokens[4].mLiteral->mNumber, 69.69, kEps);
-    EXPECT_NEAR(tokens[5].mLiteral->mNumber, 987654321, kEps);
-    EXPECT_NEAR(tokens[6].mLiteral->mNumber, 987654321.1234, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[0].mObject->mData), 11.234, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[1].mObject->mData), 1.44123456, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[2].mObject->mData), 0, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[3].mObject->mData), 0, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[4].mObject->mData), 69.69, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[5].mObject->mData), 987654321, kEps);
+    EXPECT_NEAR(std::get<double>(tokens[6].mObject->mData), 987654321.1234, kEps);
 }
 
 TEST_F(ScannerTest, Identifiers)
@@ -84,14 +84,14 @@ TEST_F(ScannerTest, Identifiers)
 
     for (int i = 0; i < 4; i++) {
         ASSERT_EQ(tokens[i].mType, Type::kIdentifier);
-        ASSERT_TRUE(tokens[i].mLiteral.has_value());
+        ASSERT_TRUE(tokens[i].mObject.has_value());
     }
     EXPECT_EQ(tokens[4].mType, Type::kEof);
 
-    EXPECT_EQ(tokens[0].mLiteral->mIdentifier, "and1");
-    EXPECT_EQ(tokens[1].mLiteral->mIdentifier, "_abcd");
-    EXPECT_EQ(tokens[2].mLiteral->mIdentifier, "for_nil");
-    EXPECT_EQ(tokens[3].mLiteral->mIdentifier, "while23_");
+    EXPECT_EQ(std::get<std::string>(tokens[0].mObject->mData), "and1");
+    EXPECT_EQ(std::get<std::string>(tokens[1].mObject->mData), "_abcd");
+    EXPECT_EQ(std::get<std::string>(tokens[2].mObject->mData), "for_nil");
+    EXPECT_EQ(std::get<std::string>(tokens[3].mObject->mData), "while23_");
 }
 
 TEST_F(ScannerTest, StringLiterals)
@@ -106,12 +106,12 @@ TEST_F(ScannerTest, StringLiterals)
     ASSERT_EQ(tokens.size(), 3);
     for (int i = 0; i < 2; i++) {
         ASSERT_EQ(tokens[i].mType, Type::kString);
-        ASSERT_TRUE(tokens[i].mLiteral.has_value());
+        ASSERT_TRUE(tokens[i].mObject.has_value());
     }
     EXPECT_EQ(tokens[2].mType, Type::kEof);
 
-    EXPECT_EQ(tokens[0].mLiteral->mString, "test123.4");
-    EXPECT_EQ(tokens[1].mLiteral->mString, "123 4#$.;|]''");
+    EXPECT_EQ(std::get<std::string>(tokens[0].mObject->mData), "test123.4");
+    EXPECT_EQ(std::get<std::string>(tokens[1].mObject->mData), "123 4#$.;|]''");
 }
 
 TEST_F(ScannerTest, Tokens)
@@ -166,14 +166,14 @@ TEST_F(ScannerTest, MixedTokens)
     EXPECT_EQ(tokens[1].mType, Type::kVar);
     
     EXPECT_EQ(tokens[2].mType, Type::kIdentifier);
-    ASSERT_TRUE(tokens[2].mLiteral.has_value());
-    EXPECT_EQ(tokens[2].mLiteral->mIdentifier, "a");
+    ASSERT_TRUE(tokens[2].mObject.has_value());
+    EXPECT_EQ(std::get<std::string>(tokens[2].mObject->mData), "a");
     EXPECT_EQ(tokens[3].mType, Type::kEqual);
 
     auto compareNumber { [&](int idx, double number) {
         EXPECT_EQ(tokens[idx].mType, Type::kNumber);
-        ASSERT_TRUE(tokens[idx].mLiteral.has_value());
-        EXPECT_NEAR(tokens[idx].mLiteral->mNumber, number, kEps);
+        ASSERT_TRUE(tokens[idx].mObject.has_value());
+        EXPECT_NEAR(std::get<double>(tokens[idx].mObject->mData), number, kEps);
     }};
 
     EXPECT_EQ(tokens[4].mType, Type::kMinus);
@@ -182,8 +182,8 @@ TEST_F(ScannerTest, MixedTokens)
     EXPECT_EQ(tokens[7].mType, Type::kNil);
     EXPECT_EQ(tokens[8].mType, Type::kStar);
     EXPECT_EQ(tokens[9].mType, Type::kIdentifier);
-    ASSERT_TRUE(tokens[9].mLiteral.has_value());
-    EXPECT_EQ(tokens[9].mLiteral->mIdentifier, "for_nil3");
+    ASSERT_TRUE(tokens[9].mObject.has_value());
+    EXPECT_EQ(std::get<std::string>(tokens[9].mObject->mData), "for_nil3");
     EXPECT_EQ(tokens[10].mType, Type::kSlash);
     compareNumber(11, 0);
 
