@@ -1,5 +1,7 @@
 #pragma once
 
+#include "literal.h"
+
 #include <map>
 #include <optional>
 #include <string>
@@ -58,12 +60,6 @@ public:
         kWhile,
 
         kEof
-    };
-
-    struct Literal {
-        std::string mIdentifier;
-        std::string mString;
-        double mNumber;
     };
 
     inline static const std::map<std::string, Type> kKeywordToType {

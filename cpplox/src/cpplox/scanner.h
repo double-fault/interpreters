@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ierror_reporter.h"
+#include "literal.h"
 #include "token.h"
 
 #include <string>
@@ -16,7 +17,7 @@ public:
 
 private:
     void ScanToken();
-    void AddToken(Token::Type type, std::optional<Token::Literal> literal = std::nullopt);
+    void AddToken(Token::Type type, std::optional<Literal> literal = std::nullopt);
 
     void ScanIdentifier();
     void ScanString();

@@ -1,4 +1,6 @@
 #include "scanner.h"
+#include "literal.h"
+#include "token.h"
 
 #include <cctype>
 
@@ -112,10 +114,11 @@ void Scanner::ScanIdentifier()
 
     Token::Type type = Token::Type::kIdentifier;
 
-    Token::Literal literal;
+    Literal literal;
     std::string identifier = mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart);
     literal.mIdentifier = identifier;
+    literal.mType = Literal::Type::kIdentifier;
 
     if (Token::kKeywordToType.find(identifier) != Token::kKeywordToType.end())
         type = Token::kKeywordToType.at(identifier);
@@ -138,9 +141,10 @@ void Scanner::ScanString()
 
     Next();
 
-    Token::Literal literal;
+    Literal literal;
     literal.mString = mSource.substr(mLexemeStart + 1,
         mCurrentCharacter - mLexemeStart - 2);
+    literal.mType = Literal::Type::kString;
 
     AddToken(Token::Type::kString, literal);
 }
@@ -157,14 +161,15 @@ void Scanner::ScanNumber()
             Next();
     }
 
-    Token::Literal literal;
+    Literal literal;
     literal.mNumber = std::stod(mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart));
+    literal.mType = Literal::Type::kNumber;
 
     AddToken(Token::Type::kNumber, literal);
 }
 
-void Scanner::AddToken(Token::Type type, std::optional<Token::Literal> literal)
+void Scanner::AddToken(Token::Type type, std::optional<Literal> literal)
 {
     mTokens.emplace_back(type, mSource.substr(mLexemeStart, mCurrentCharacter - mLexemeStart), mLine, literal);
 }

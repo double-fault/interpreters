@@ -7,7 +7,7 @@
 namespace cpplox {
 
 Token::Token(Token::Type type, const std::string& lexeme, int line,
-    const std::optional<Token::Literal> literal)
+    const std::optional<Literal> literal)
     : mType { type }
     , mLexeme { lexeme }
     , mLine { line }
@@ -19,13 +19,8 @@ std::ostream& operator<<(std::ostream& out, const Token& token)
 {
     out << magic_enum::enum_name(token.mType) << ": " << token.mLexeme << " (line=" << token.mLine;
 
-    if (token.mType == Token::Type::kIdentifier) {
-        out << ", ident=" << token.mLiteral->mIdentifier;
-    } else if (token.mType == Token::Type::kString) {
-        out << ", string=" << token.mLiteral->mString;
-    } else if (token.mType == Token::Type::kNumber) {
-        out << ", number=" << token.mLiteral->mNumber;
-    }
+    if (token.mLiteral.has_value()) 
+        out << token.mLiteral.value();
 
     out << ")";
     return out;
