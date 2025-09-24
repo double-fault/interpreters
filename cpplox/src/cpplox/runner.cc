@@ -1,5 +1,6 @@
 #include "runner.h"
 #include "ast_printer.h"
+#include "interpreter.h"
 #include "parser.h"
 #include "scanner.h"
 
@@ -25,18 +26,27 @@ void Runner::Run(std::string_view source)
         std::cout << token << "\n";
     }
 
-    if (tokens.size() > 1) {
-        spdlog::info("Parsing tokens..");
+    if (tokens.size() == 1)
+        return;
 
-        Parser parser(tokens);
-        std::unique_ptr<IExpression> ptr = parser.Parse();
+    spdlog::info("Parsing tokens..");
 
-        spdlog::info("Printing AST..");
+    Parser parser(tokens);
+    std::unique_ptr<IExpression> ptr = parser.Parse();
 
-        AstPrinter printer {};
-        printer.Visit(ptr.get());
-        std::cout << printer.GetResult() << "\n";
-    }
+    spdlog::info("Printing AST..");
+
+    AstPrinter printer {};
+    printer.Visit(ptr.get());
+    std::cout << printer.GetResult() << "\n";
+
+    spdlog::info("Interpreting AST..");
+
+    Interpreter interpreter {};
+    interpreter.Visit(ptr.get());
+
+    Object result = interpreter.GetResult();
+    std::cout << result << "\n";
 }
 
 }

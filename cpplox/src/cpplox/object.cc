@@ -16,6 +16,10 @@ std::string Object::ToString() const
         ret += std::get<std::string>(mData);
     } else if (mType == Object::Type::kNumber) {
         ret += std::to_string(std::get<double>(mData));
+    } else if (mType == Object::Type::kBool) {
+        ret += std::to_string(std::get<bool>(mData));
+    } else if (mType == Object::Type::kNil) {
+        ret += "nil";
     }
 
     return ret;
