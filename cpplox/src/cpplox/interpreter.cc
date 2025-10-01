@@ -3,10 +3,27 @@
 #include "object.h"
 #include "parser.h"
 #include "token.h"
+
+#include <spdlog/spdlog.h>
+#include <memory>
 #include <string>
+#include <iostream>
 #include <variant>
+#include <vector>
 
 namespace cpplox {
+
+Interpreter::Interpreter(std::vector<std::unique_ptr<IStatement>>&& statements) 
+    : mStatements { std::move(statements) }
+{
+}
+
+void Interpreter::Run()
+{
+    for (auto& statement: mStatements) {
+        statement->Accept(this);
+    }
+}
 
 bool Interpreter::IsTrue(const Object& object)
 {
@@ -35,6 +52,41 @@ Object Interpreter::Evaluate(IExpression* expression)
 {
     expression->Accept(this);
     return GetResult();
+}
+
+void Interpreter::Visit(IStatement* statement)
+{
+    statement->Accept(this);
+}
+
+void Interpreter::Visit(StatementExpression* statement)
+{
+    mResult = Evaluate(statement->mExpression.get());
+}
+
+void Interpreter::Visit(StatementPrint* print)
+{
+    mResult = Evaluate(print->mExpression.get());
+    std::cout << mResult << "\n";
+}
+
+void Interpreter::Visit(StatementVariable* variable)
+{
+    Object initializer{};
+    if (variable->mInitializer.has_value()) {
+        initializer = Evaluate(variable->mInitializer.value().get());
+    }
+    mEnvironment.Define(variable->mName->mLexeme, initializer);
+}
+
+void Interpreter::Visit(StatementBlock* block)
+{
+    Environment old { mEnvironment };
+    mEnvironment = Environment(&old);
+    for (auto& statement: block->mBlock) {
+        statement->Accept(this);
+    }
+    mEnvironment = old;
 }
 
 void Interpreter::Visit(IExpression* expression)
@@ -139,6 +191,17 @@ void Interpreter::Visit(ExpressionBinary* binary)
     default:
         throw ParserException("Interpreter internal error while interpreting type ExpressionBinary");
     }
+}
+
+void Interpreter::Visit(ExpressionVariable* variable)
+{
+    mResult = *mEnvironment.Get(variable->mName->mLexeme);
+}
+
+void Interpreter::Visit(ExpressionAssignment* assignment)
+{
+    mResult = Evaluate(assignment->mValue.get());
+    mEnvironment.Define(assignment->mName->mLexeme, mResult);
 }
 
 }

@@ -32,21 +32,20 @@ void Runner::Run(std::string_view source)
     spdlog::info("Parsing tokens..");
 
     Parser parser(tokens);
-    std::unique_ptr<IExpression> ptr = parser.Parse();
+    std::vector<std::unique_ptr<IStatement>> statements = parser.Parse();
 
+    /*
     spdlog::info("Printing AST..");
 
     AstPrinter printer {};
     printer.Visit(ptr.get());
     std::cout << printer.GetResult() << "\n";
+    */
 
     spdlog::info("Interpreting AST..");
 
-    Interpreter interpreter {};
-    interpreter.Visit(ptr.get());
-
-    Object result = interpreter.GetResult();
-    std::cout << result << "\n";
+    Interpreter interpreter(std::move(statements)); 
+    interpreter.Run();
 }
 
 }

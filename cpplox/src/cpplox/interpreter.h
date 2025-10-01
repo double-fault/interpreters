@@ -1,25 +1,38 @@
 #pragma once
 
 #include "ast.h"
+#include "environment.h"
 #include "object.h"
 #include "parser.h"
 
 #include <boost/type_index.hpp>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
 
 namespace cpplox {
 
-class Interpreter : public IExpressionVisitor {
+class Interpreter : public IExpressionVisitor, public IStatementVisitor {
 public:
+    Interpreter(std::vector<std::unique_ptr<IStatement>>&&);
+    void Run();
+
+    void Visit(IStatement*) override;
+    void Visit(StatementExpression*) override;
+    void Visit(StatementPrint*) override;
+    void Visit(StatementVariable*) override;
+    void Visit(StatementBlock*) override;
+
     void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
     void Visit(ExpressionGrouping*) override;
     void Visit(ExpressionObject*) override;
     void Visit(ExpressionUnary*) override;
+    void Visit(ExpressionVariable*) override;
+    void Visit(ExpressionAssignment*) override;
 
     Object GetResult();
 
@@ -44,6 +57,9 @@ private:
         ((void)AssertTypeSingle<T...>(objects), ...);
     }
 
+    Environment mEnvironment;
+    std::vector<std::unique_ptr<IStatement>> mStatements;
+    
     Object mResult;
 };
 

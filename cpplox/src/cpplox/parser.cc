@@ -5,7 +5,9 @@
 
 #include <initializer_list>
 #include <memory>
+#include <optional>
 #include <spdlog/spdlog.h>
+#include <utility>
 
 namespace cpplox {
 
@@ -15,14 +17,102 @@ Parser::Parser(const std::vector<Token>& tokens)
     mTokens.pop_back(); // Get rid of EOF token
 }
 
-std::unique_ptr<IExpression> Parser::Parse()
+std::vector<std::unique_ptr<IStatement>> Parser::Parse()
 {
-    return Expression();
+    std::vector<std::unique_ptr<IStatement>> statements;
+    while (mIterator != mTokens.end()) {
+        statements.push_back(Declaration());
+    }
+    return statements;
+}
+
+// TODO: Synchronize
+std::unique_ptr<IStatement> Parser::Declaration()
+{
+    if (Match({ Token::Type::kVar })) {
+        Next();
+        return DeclarationVariable();
+    }
+    return Statement();
+}
+
+std::unique_ptr<IStatement> Parser::DeclarationVariable()
+{
+    if (!Match({ Token::Type::kIdentifier })) {
+        throw ParserException("Expected variable name");
+    }
+    std::unique_ptr<Token> name = std::make_unique<Token>(*Peek());
+    Next();
+
+    std::optional<std::unique_ptr<IExpression>> initializer { std::nullopt };
+    if (Match({ Token::Type::kEqual })) {
+        Next();
+        initializer = Expression();
+    }
+
+    if (!Match({ Token::Type::kSemicolon })) {
+        throw ParserException("Expected semicolon after variable declaration");
+    }
+    Next();
+    return std::make_unique<StatementVariable>(std::move(name), std::move(initializer));
+}
+
+std::unique_ptr<IStatement> Parser::Statement()
+{
+    if (Match({ Token::Type::kPrint })) {
+        Next();
+        std::unique_ptr<IExpression> expression = Expression();
+        if (!Match({ Token::Type::kSemicolon })) {
+            throw ParserException("Expected semicolon after statement");
+        }
+        Next();
+        return std::make_unique<StatementPrint>(std::move(expression));
+    }
+
+    if (Match({Token::Type::kLeftBrace})) {
+        std::vector<std::unique_ptr<IStatement>> block;
+        Next();
+
+        while (!Match({Token::Type::kRightBrace})) {
+            if (mIterator == mTokens.end()) {
+                throw ParserException("Expected '}' at end of block");
+            }
+
+            block.push_back(Declaration());
+        }
+        Next();
+
+        return std::make_unique<StatementBlock>(std::move(block));
+    }
+
+    std::unique_ptr<IExpression> expression = Expression();
+    if (!Match({ Token::Type::kSemicolon })) {
+        throw ParserException("Expected semicolon after statement");
+    }
+    Next();
+    return std::make_unique<StatementExpression>(std::move(expression));
 }
 
 std::unique_ptr<IExpression> Parser::Expression()
 {
-    return Equality();
+    return Assignment();
+}
+
+std::unique_ptr<IExpression> Parser::Assignment()
+{
+    std::unique_ptr<IExpression> expression = Equality();
+
+    if (Match({ Token::Type::kEqual })) {
+        Next();
+
+        ExpressionVariable* variable = dynamic_cast<ExpressionVariable*>(expression.get());
+        if (variable == nullptr) {
+            throw ParserException("Invalid assignment target");
+        }
+
+        return std::make_unique<ExpressionAssignment>(std::move(variable->mName), Assignment());
+    }
+    return expression;
 }
 
 std::unique_ptr<IExpression> Parser::Equality()
@@ -116,6 +206,13 @@ std::unique_ptr<IExpression> Parser::Primary()
         }
         Next();
         return std::make_unique<ExpressionGrouping>(std::move(expression));
+    }
+
+    if (Match({ Token::Type::kIdentifier })) {
+        std::unique_ptr<IExpression> expression = std::make_unique<ExpressionVariable>(
+            std::make_unique<Token>(*Peek()));
+        Next();
+        return expression;
     }
 
     throw ParserException("Unknown token encountered by parser");

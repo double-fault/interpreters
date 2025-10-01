@@ -22,10 +22,16 @@ class Parser final {
 public:
     Parser(const std::vector<Token>&);
 
-    std::unique_ptr<IExpression> Parse();
+    std::vector<std::unique_ptr<IStatement>> Parse();
 
 private:
+    std::unique_ptr<IStatement> Declaration();
+    std::unique_ptr<IStatement> DeclarationVariable();
+    std::unique_ptr<IStatement> Statement();
+    std::unique_ptr<IStatement> Block();
+
     std::unique_ptr<IExpression> Expression();
+    std::unique_ptr<IExpression> Assignment();
     std::unique_ptr<IExpression> Equality();
     std::unique_ptr<IExpression> Comparison();
     std::unique_ptr<IExpression> Term();
