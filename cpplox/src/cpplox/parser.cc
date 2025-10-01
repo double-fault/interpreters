@@ -5,6 +5,7 @@
 
 #include <initializer_list>
 #include <memory>
+#include <vector>
 #include <optional>
 #include <spdlog/spdlog.h>
 #include <utility>
@@ -69,11 +70,11 @@ std::unique_ptr<IStatement> Parser::Statement()
         return std::make_unique<StatementPrint>(std::move(expression));
     }
 
-    if (Match({Token::Type::kLeftBrace})) {
+    if (Match({ Token::Type::kLeftBrace })) {
         std::vector<std::unique_ptr<IStatement>> block;
         Next();
 
-        while (!Match({Token::Type::kRightBrace})) {
+        while (!Match({ Token::Type::kRightBrace })) {
             if (mIterator == mTokens.end()) {
                 throw ParserException("Expected '}' at end of block");
             }
@@ -85,12 +86,145 @@ std::unique_ptr<IStatement> Parser::Statement()
         return std::make_unique<StatementBlock>(std::move(block));
     }
 
+    if (Match({ Token::Type::kIf })) {
+        Next();
+        return If();
+    }
+
+    if (Match({ Token::Type::kWhile })) {
+        Next();
+        return While();
+    }
+
+    if (Match({ Token::Type::kFor })) {
+        Next();
+        return For();
+    }
+
+    if (Match({ Token::Type::kSemicolon })) {
+        Next();
+        return nullptr;
+    }
+
+    return ExpressionStatement();
+}
+
+std::unique_ptr<IStatement> Parser::ExpressionStatement()
+{
     std::unique_ptr<IExpression> expression = Expression();
     if (!Match({ Token::Type::kSemicolon })) {
         throw ParserException("Expected semicolon after statement");
     }
     Next();
     return std::make_unique<StatementExpression>(std::move(expression));
+}
+
+std::unique_ptr<IStatement> Parser::If()
+{
+    if (!Match({ Token::Type::kLeftParen })) {
+        throw ParserException("Expected '(' after if");
+    }
+    Next();
+
+    std::unique_ptr<IExpression> condition = Expression();
+
+    if (!Match({ Token::Type::kRightParen })) {
+        throw ParserException("Expected ')' after if condition");
+    }
+    Next();
+
+    std::unique_ptr<IStatement> thenStatement = Statement();
+    std::unique_ptr<IStatement> elseStatement = nullptr;
+    if (Match({ Token::Type::kElse })) {
+        Next();
+        elseStatement = Statement();
+    }
+
+    return std::make_unique<StatementIf>(std::move(condition),
+        std::move(thenStatement), std::move(elseStatement));
+}
+
+std::unique_ptr<IStatement> Parser::While()
+{
+    if (!Match({ Token::Type::kLeftParen })) {
+        throw ParserException("Expected '(' after while");
+    }
+    Next();
+
+    std::unique_ptr<IExpression> condition = Expression();
+
+    if (!Match({ Token::Type::kRightParen })) {
+        throw ParserException("Expected ')' after while condition");
+    }
+    Next();
+
+    std::unique_ptr<IStatement> body = Statement();
+
+    return std::make_unique<StatementWhile>(std::move(condition), std::move(body));
+}
+
+std::unique_ptr<IStatement> Parser::For()
+{
+    if (!Match({ Token::Type::kLeftParen })) {
+        throw ParserException("Expected '(' after for");
+    }
+    Next();
+
+    std::unique_ptr<IStatement> initializer { nullptr };
+
+    if (Match({ Token::Type::kSemicolon }))
+        Next();
+    else if (Match({ Token::Type::kVar })) {
+        Next();
+        initializer = DeclarationVariable();
+    } else {
+        initializer = ExpressionStatement();
+    }
+
+    std::unique_ptr<IExpression> condition { nullptr };
+    if (!Match({ Token::Type::kSemicolon })) {
+        condition = Expression();
+    }
+
+    if (!Match({ Token::Type::kSemicolon })) {
+        throw ParserException("Expected ; after for loop condition");
+    }
+    Next();
+
+    std::unique_ptr<IExpression> action { nullptr };
+    if (!Match({ Token::Type::kRightParen })) {
+        action = Expression();
+    }
+
+    if (!Match({ Token::Type::kRightParen })) {
+        throw ParserException("Expected ) at end of for loop");
+    }
+    Next();
+
+    std::unique_ptr<IStatement> body { Statement() };
+
+    if (action != nullptr) {
+        std::vector<std::unique_ptr<IStatement>> arg;
+        arg.push_back(std::move(body));
+        arg.push_back(std::make_unique<StatementExpression>(std::move(action)));
+
+        body = std::make_unique<StatementBlock>(std::move(arg));
+    }
+
+    if (condition == nullptr) {
+        condition = std::make_unique<ExpressionObject>(Object(true));
+    }
+    
+    body = std::make_unique<StatementWhile>(std::move(condition), std::move(body));
+
+    if (initializer != nullptr) {
+        std::vector<std::unique_ptr<IStatement>> arg;
+        arg.push_back(std::move(initializer));
+        arg.push_back(std::move(body));
+
+        body = std::make_unique<StatementBlock>(std::move(arg));
+    }
+    return body;
 }
 
 std::unique_ptr<IExpression> Parser::Expression()
@@ -100,7 +234,7 @@ std::unique_ptr<IExpression> Parser::Expression()
 
 std::unique_ptr<IExpression> Parser::Assignment()
 {
-    std::unique_ptr<IExpression> expression = Equality();
+    std::unique_ptr<IExpression> expression = LogicalOr();
 
     if (Match({ Token::Type::kEqual })) {
         Next();
@@ -113,6 +247,36 @@ std::unique_ptr<IExpression> Parser::Assignment()
         return std::make_unique<ExpressionAssignment>(std::move(variable->mName), Assignment());
     }
     return expression;
+}
+
+std::unique_ptr<IExpression> Parser::LogicalOr()
+{
+    std::unique_ptr<IExpression> left = LogicalAnd();
+
+    if (Match({ Token::Type::kOr })) {
+        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        Next();
+
+        std::unique_ptr<IExpression> right = Equality();
+
+        return std::make_unique<ExpressionLogical>(std::move(left), std::move(op), std::move(right));
+    }
+    return left;
+}
+
+std::unique_ptr<IExpression> Parser::LogicalAnd()
+{
+    std::unique_ptr<IExpression> left = Equality();
+
+    if (Match({ Token::Type::kAnd })) {
+        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        Next();
+
+        std::unique_ptr<IExpression> right = Equality();
+
+        return std::make_unique<ExpressionLogical>(std::move(left), std::move(op), std::move(right));
+    }
+    return left;
 }
 
 std::unique_ptr<IExpression> Parser::Equality()

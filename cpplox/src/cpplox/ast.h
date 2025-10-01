@@ -19,8 +19,11 @@ class StatementExpression;
 class StatementPrint;
 class StatementVariable;
 class StatementBlock;
+class StatementIf;
+class StatementWhile;
 
 class ExpressionBinary;
+class ExpressionLogical;
 class ExpressionGrouping;
 class ExpressionObject;
 class ExpressionUnary;
@@ -41,6 +44,8 @@ public:
     virtual void Visit(StatementPrint*) = 0;
     virtual void Visit(StatementVariable*) = 0;
     virtual void Visit(StatementBlock*) = 0;
+    virtual void Visit(StatementIf*) = 0;
+    virtual void Visit(StatementWhile*) = 0;
 
     virtual ~IStatementVisitor() = default;
 };
@@ -56,6 +61,7 @@ class IExpressionVisitor {
 public:
     virtual void Visit(IExpression*) = 0;
     virtual void Visit(ExpressionBinary*) = 0;
+    virtual void Visit(ExpressionLogical*) = 0;
     virtual void Visit(ExpressionGrouping*) = 0;
     virtual void Visit(ExpressionObject*) = 0;
     virtual void Visit(ExpressionUnary*) = 0;
@@ -127,6 +133,43 @@ public:
     std::vector<std::unique_ptr<IStatement>> mBlock;
 };
 
+class StatementIf final : public IStatement {
+public:
+    StatementIf(std::unique_ptr<IExpression> condition, std::unique_ptr<IStatement> thenStatement,
+        std::unique_ptr<IStatement> elseStatement)
+        : mCondition { std::move(condition) }
+        , mThenStatement { std::move(thenStatement) }
+        , mElseStatement { std::move(elseStatement) }
+    {
+    }
+
+    void Accept(IStatementVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mCondition;
+    std::unique_ptr<IStatement> mThenStatement;
+    std::unique_ptr<IStatement> mElseStatement;
+};
+
+class StatementWhile final : public IStatement {
+public:
+    StatementWhile(std::unique_ptr<IExpression> condition, std::unique_ptr<IStatement> body)
+        : mCondition { std::move(condition) }
+        , mBody { std::move(body) }
+    {
+    }
+
+    void Accept(IStatementVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mCondition;
+    std::unique_ptr<IStatement> mBody;
+};
+
 class ExpressionBinary final : public IExpression {
 public:
     ExpressionBinary(std::unique_ptr<IExpression> left, std::unique_ptr<Token> op, std::unique_ptr<IExpression> right)
@@ -144,6 +187,24 @@ public:
     std::unique_ptr<IExpression> mLeft;
     std::unique_ptr<Token> mOperator;
     std::unique_ptr<IExpression> mRight;
+};
+
+class ExpressionLogical final : public IExpression {
+public:
+    ExpressionLogical(std::unique_ptr<IExpression> left, std::unique_ptr<Token> op, std::unique_ptr<IExpression> right)
+        : mLeft { std::move(left) }
+        , mOperator { std::move(op) }
+        , mRight { std::move(right) }
+    {
+    }
+
+    void Accept(IExpressionVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mLeft, mRight;
+    std::unique_ptr<Token> mOperator;
 };
 
 class ExpressionGrouping final : public IExpression {

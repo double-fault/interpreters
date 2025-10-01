@@ -4,24 +4,26 @@
 #include "parser.h"
 #include "token.h"
 
-#include <spdlog/spdlog.h>
-#include <memory>
-#include <string>
 #include <iostream>
+#include <memory>
+#include <spdlog/spdlog.h>
+#include <string>
 #include <variant>
 #include <vector>
 
 namespace cpplox {
 
-Interpreter::Interpreter(std::vector<std::unique_ptr<IStatement>>&& statements) 
+Interpreter::Interpreter(std::vector<std::unique_ptr<IStatement>>&& statements)
     : mStatements { std::move(statements) }
+    , mEnvironment { std::make_unique<Environment>() }
 {
 }
 
 void Interpreter::Run()
 {
-    for (auto& statement: mStatements) {
-        statement->Accept(this);
+    for (auto& statement : mStatements) {
+        if (statement != nullptr)
+            statement->Accept(this);
     }
 }
 
@@ -72,21 +74,38 @@ void Interpreter::Visit(StatementPrint* print)
 
 void Interpreter::Visit(StatementVariable* variable)
 {
-    Object initializer{};
+    Object initializer {};
     if (variable->mInitializer.has_value()) {
         initializer = Evaluate(variable->mInitializer.value().get());
     }
-    mEnvironment.Define(variable->mName->mLexeme, initializer);
+    mEnvironment->Define(variable->mName->mLexeme, initializer);
 }
 
 void Interpreter::Visit(StatementBlock* block)
 {
-    Environment old { mEnvironment };
-    mEnvironment = Environment(&old);
-    for (auto& statement: block->mBlock) {
-        statement->Accept(this);
+    mEnvironment = std::make_unique<Environment>(std::move(mEnvironment));
+    for (auto& statement : block->mBlock) {
+        if (statement != nullptr) 
+            statement->Accept(this);
     }
-    mEnvironment = old;
+    mEnvironment = std::move(mEnvironment->mEnclosingEnvironment);
+}
+
+void Interpreter::Visit(StatementIf* ifStatement)
+{
+    if (IsTrue(Evaluate(ifStatement->mCondition.get()))) {
+        if (ifStatement->mThenStatement != nullptr)
+            ifStatement->mThenStatement->Accept(this);
+    } else if (ifStatement->mElseStatement != nullptr) {
+        ifStatement->mElseStatement->Accept(this);
+    }
+}
+
+void Interpreter::Visit(StatementWhile* whileStatement)
+{
+    while (IsTrue(Evaluate(whileStatement->mCondition.get()))) {
+        whileStatement->mBody->Accept(this);
+    }
 }
 
 void Interpreter::Visit(IExpression* expression)
@@ -120,6 +139,32 @@ void Interpreter::Visit(ExpressionUnary* unary)
 
     default:
         throw ParserException("Interpreter internal error while interpreting type ExpressionUnary");
+    }
+}
+
+void Interpreter::Visit(ExpressionLogical* logical)
+{
+    Object left = Evaluate(logical->mLeft.get());
+
+    switch (logical->mOperator->mType) {
+    case Token::Type::kOr:
+        if (IsTrue(left)) {
+            mResult = left;
+            break;
+        }
+        mResult = Evaluate(logical->mRight.get());
+        break;
+
+    case Token::Type::kAnd:
+        if (!IsTrue(left)) {
+            mResult = left;
+            break;
+        }
+        mResult = Evaluate(logical->mRight.get());
+        break;
+
+    default:
+        throw ParserException("Interpreter internal error while interpreting ExpressionLogical");
     }
 }
 
@@ -195,13 +240,13 @@ void Interpreter::Visit(ExpressionBinary* binary)
 
 void Interpreter::Visit(ExpressionVariable* variable)
 {
-    mResult = *mEnvironment.Get(variable->mName->mLexeme);
+    mResult = *mEnvironment->Get(variable->mName->mLexeme);
 }
 
 void Interpreter::Visit(ExpressionAssignment* assignment)
 {
     mResult = Evaluate(assignment->mValue.get());
-    mEnvironment.Define(assignment->mName->mLexeme, mResult);
+    mEnvironment->Assign(assignment->mName->mLexeme, mResult);
 }
 
 }

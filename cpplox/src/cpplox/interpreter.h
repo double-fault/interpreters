@@ -25,9 +25,12 @@ public:
     void Visit(StatementPrint*) override;
     void Visit(StatementVariable*) override;
     void Visit(StatementBlock*) override;
+    void Visit(StatementIf*) override;
+    void Visit(StatementWhile*) override;
 
     void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
+    void Visit(ExpressionLogical*) override;
     void Visit(ExpressionGrouping*) override;
     void Visit(ExpressionObject*) override;
     void Visit(ExpressionUnary*) override;
@@ -57,7 +60,7 @@ private:
         ((void)AssertTypeSingle<T...>(objects), ...);
     }
 
-    Environment mEnvironment;
+    std::unique_ptr<Environment> mEnvironment;
     std::vector<std::unique_ptr<IStatement>> mStatements;
     
     Object mResult;

@@ -22,10 +22,6 @@ void Runner::Run(std::string_view source)
     spdlog::info("Scanning source..");
 
     std::vector<Token> tokens = scanner.ScanTokens();
-    for (auto& token : tokens) {
-        std::cout << token << "\n";
-    }
-
     if (tokens.size() == 1)
         return;
 

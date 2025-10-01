@@ -1,6 +1,9 @@
 #include "environment.h"
 #include "parser.h"
-#include "spdlog/fmt/bundled/format.h"
+
+#include <spdlog/fmt/bundled/format.h>
+#include <spdlog/spdlog.h>
+#include <memory>
 
 namespace cpplox {
 
@@ -9,8 +12,8 @@ Environment::Environment()
 {
 }
 
-Environment::Environment(Environment* enclosingEnvironment)
-    : mEnclosingEnvironment { enclosingEnvironment }
+Environment::Environment(std::unique_ptr<Environment> enclosingEnvironment)
+    : mEnclosingEnvironment { std::move(enclosingEnvironment) }
 {
 }
 
