@@ -27,11 +27,13 @@ public:
 private:
     std::unique_ptr<IStatement> Declaration();
     std::unique_ptr<IStatement> DeclarationVariable();
+    std::unique_ptr<IStatement> DeclarationFunction();
     std::unique_ptr<IStatement> Statement();
     std::unique_ptr<IStatement> ExpressionStatement();
     std::unique_ptr<IStatement> If();
     std::unique_ptr<IStatement> While();
     std::unique_ptr<IStatement> For();
+    std::unique_ptr<IStatement> Return();
 
     std::unique_ptr<IExpression> Expression();
     std::unique_ptr<IExpression> Assignment();
@@ -42,6 +44,7 @@ private:
     std::unique_ptr<IExpression> Term();
     std::unique_ptr<IExpression> Factor();
     std::unique_ptr<IExpression> Unary();
+    std::unique_ptr<IExpression> Call();
     std::unique_ptr<IExpression> Primary();
 
     bool Match(std::initializer_list<Token::Type>);

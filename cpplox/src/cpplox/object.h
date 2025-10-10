@@ -1,50 +1,31 @@
 #pragma once
 
+#include "icallable.h"
+
+#include <memory>
 #include <string>
 #include <variant>
 
 namespace cpplox {
 
 struct Object {
-    enum class Type {
-        kError = 0,
-
-        kIdentifier,
-        kString,
-        kNumber,
-        kBool,
-        kNil
-    };
-
     Object()
-        : mType { Type::kNil }
+        : mData { std::monostate {} }
     {
     }
 
-    Object(bool value)
-        : mType { Type::kBool }
-        , mData { value }
+    template <typename T>
+    Object(const T& data)
+        : mData { data }
     {
     }
 
-    Object(std::string value)
-        : mType { Type::kString }
-        , mData { value }
-    {
-    }
-
-    Object(double value)
-        : mType { Type::kNumber }
-        , mData { value }
-    {
-    }
-
+    bool IsNil() const;
     std::string ToString() const;
 
     friend std::ostream& operator<<(std::ostream& out, const Object& token);
 
-    Type mType;
-    std::variant<double, bool, std::string> mData;
+    std::variant<std::monostate, double, bool, std::string, std::shared_ptr<ICallable>> mData;
 };
 
-};
+}

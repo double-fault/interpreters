@@ -114,11 +114,9 @@ void Scanner::ScanIdentifier()
 
     Token::Type type = Token::Type::kIdentifier;
 
-    Object literal;
     std::string identifier = mSource.substr(mLexemeStart,
         mCurrentCharacter - mLexemeStart);
-    literal.mData = identifier;
-    literal.mType = Object::Type::kIdentifier;
+    Object literal { identifier };
 
     if (Token::kKeywordToType.find(identifier) != Token::kKeywordToType.end())
         type = Token::kKeywordToType.at(identifier);
@@ -141,10 +139,8 @@ void Scanner::ScanString()
 
     Next();
 
-    Object literal;
-    literal.mData = mSource.substr(mLexemeStart + 1,
-        mCurrentCharacter - mLexemeStart - 2);
-    literal.mType = Object::Type::kString;
+    Object literal { mSource.substr(mLexemeStart + 1,
+        mCurrentCharacter - mLexemeStart - 2) };
 
     AddToken(Token::Type::kString, literal);
 }
@@ -161,10 +157,8 @@ void Scanner::ScanNumber()
             Next();
     }
 
-    Object literal;
-    literal.mData = std::stod(mSource.substr(mLexemeStart,
-        mCurrentCharacter - mLexemeStart));
-    literal.mType = Object::Type::kNumber;
+    Object literal { std::stod(mSource.substr(mLexemeStart,
+        mCurrentCharacter - mLexemeStart)) };
 
     AddToken(Token::Type::kNumber, literal);
 }

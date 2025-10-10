@@ -3,7 +3,6 @@
 
 #include <spdlog/fmt/bundled/format.h>
 #include <spdlog/spdlog.h>
-#include <memory>
 
 namespace cpplox {
 
@@ -12,8 +11,8 @@ Environment::Environment()
 {
 }
 
-Environment::Environment(std::unique_ptr<Environment> enclosingEnvironment)
-    : mEnclosingEnvironment { std::move(enclosingEnvironment) }
+Environment::Environment(Environment* enclosingEnvironment)
+    : mEnclosingEnvironment { enclosingEnvironment }
 {
 }
 

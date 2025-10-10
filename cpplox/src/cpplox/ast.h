@@ -7,6 +7,8 @@
 #include <optional>
 #include <vector>
 
+// TODO: Replace passing Tokens into AST nodes with more specific items - variable name (std::string), operator type, etc.
+
 namespace cpplox {
 
 class IExpression;
@@ -21,6 +23,8 @@ class StatementVariable;
 class StatementBlock;
 class StatementIf;
 class StatementWhile;
+class StatementFunction;
+class StatementReturn;
 
 class ExpressionBinary;
 class ExpressionLogical;
@@ -29,6 +33,7 @@ class ExpressionObject;
 class ExpressionUnary;
 class ExpressionVariable;
 class ExpressionAssignment;
+class ExpressionCall;
 
 class IStatement {
 public:
@@ -46,6 +51,8 @@ public:
     virtual void Visit(StatementBlock*) = 0;
     virtual void Visit(StatementIf*) = 0;
     virtual void Visit(StatementWhile*) = 0;
+    virtual void Visit(StatementFunction*) = 0;
+    virtual void Visit(StatementReturn*) = 0;
 
     virtual ~IStatementVisitor() = default;
 };
@@ -67,6 +74,7 @@ public:
     virtual void Visit(ExpressionUnary*) = 0;
     virtual void Visit(ExpressionVariable*) = 0;
     virtual void Visit(ExpressionAssignment*) = 0;
+    virtual void Visit(ExpressionCall*) = 0;
 
     virtual ~IExpressionVisitor() = default;
 };
@@ -168,6 +176,46 @@ public:
 
     std::unique_ptr<IExpression> mCondition;
     std::unique_ptr<IStatement> mBody;
+};
+
+class StatementFunction final : public IStatement {
+public:
+    StatementFunction(std::unique_ptr<Token> identifier, std::vector<std::unique_ptr<Token>> parameters,
+        std::unique_ptr<IStatement> body)
+        : mIdentifier { std::move(identifier) }
+        , mParameters { std::move(parameters) }
+        , mBody { std::move(body) }
+    {
+    }
+
+    void Accept(IStatementVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<Token> mIdentifier;
+    std::vector<std::unique_ptr<Token>> mParameters;
+    std::unique_ptr<IStatement> mBody;
+};
+
+class StatementReturn final : public IStatement {
+public:
+    StatementReturn()
+        : mExpression { nullptr }
+    {
+    }
+
+    StatementReturn(std::unique_ptr<IExpression> expression)
+        : mExpression { std::move(expression) }
+    {
+    }
+
+    void Accept(IStatementVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mExpression;
 };
 
 class ExpressionBinary final : public IExpression {
@@ -284,6 +332,23 @@ public:
 
     std::unique_ptr<Token> mName;
     std::unique_ptr<IExpression> mValue;
+};
+
+class ExpressionCall final : public IExpression {
+public:
+    ExpressionCall(std::unique_ptr<IExpression> callee, std::vector<std::unique_ptr<IExpression>> arguments)
+        : mCallee { std::move(callee) }
+        , mArguments { std::move(arguments) }
+    {
+    }
+
+    void Accept(IExpressionVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mCallee;
+    std::vector<std::unique_ptr<IExpression>> mArguments;
 };
 
 }

@@ -15,8 +15,17 @@
 
 namespace cpplox {
 
-class Interpreter : public IExpressionVisitor, public IStatementVisitor {
+class Interpreter : public IExpressionVisitor,
+                    public IStatementVisitor {
 public:
+    class ReturnException final : public std::runtime_error {
+    public:
+        ReturnException()
+            : std::runtime_error { "interpreter return exception - is always caught, you should not be seeing this" }
+        {
+        }
+    };
+
     Interpreter(std::vector<std::unique_ptr<IStatement>>&&);
     void Run();
 
@@ -27,6 +36,8 @@ public:
     void Visit(StatementBlock*) override;
     void Visit(StatementIf*) override;
     void Visit(StatementWhile*) override;
+    void Visit(StatementFunction*) override;
+    void Visit(StatementReturn*) override;
 
     void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
@@ -36,8 +47,11 @@ public:
     void Visit(ExpressionUnary*) override;
     void Visit(ExpressionVariable*) override;
     void Visit(ExpressionAssignment*) override;
+    void Visit(ExpressionCall*) override;
 
     Object GetResult();
+
+    std::unique_ptr<Environment> mEnvironment;
 
 private:
     Object Evaluate(IExpression*);
@@ -60,9 +74,8 @@ private:
         ((void)AssertTypeSingle<T...>(objects), ...);
     }
 
-    std::unique_ptr<Environment> mEnvironment;
     std::vector<std::unique_ptr<IStatement>> mStatements;
-    
+
     Object mResult;
 };
 

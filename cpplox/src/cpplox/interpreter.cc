@@ -1,5 +1,7 @@
 #include "interpreter.h"
 #include "ast.h"
+#include "function.h"
+#include "icallable.h"
 #include "object.h"
 #include "parser.h"
 #include "token.h"
@@ -29,19 +31,15 @@ void Interpreter::Run()
 
 bool Interpreter::IsTrue(const Object& object)
 {
-    if (object.mType == Object::Type::kNil)
+    if (object.IsNil())
         return false;
-    if (object.mType == Object::Type::kBool)
+    if (std::holds_alternative<bool>(object.mData))
         return std::get<bool>(object.mData);
     return true;
 }
 
 bool Interpreter::IsEqual(const Object& a, const Object& b)
 {
-    if (a.mType == Object::Type::kNil || b.mType == Object::Type::kNil) {
-        return a.mType == b.mType;
-    }
-
     return a.mData == b.mData;
 }
 
@@ -83,12 +81,13 @@ void Interpreter::Visit(StatementVariable* variable)
 
 void Interpreter::Visit(StatementBlock* block)
 {
-    mEnvironment = std::make_unique<Environment>(std::move(mEnvironment));
+    std::unique_ptr<Environment> oldEnvironment = std::move(mEnvironment);
+    mEnvironment = std::make_unique<Environment>(oldEnvironment.get());
     for (auto& statement : block->mBlock) {
-        if (statement != nullptr) 
+        if (statement != nullptr)
             statement->Accept(this);
     }
-    mEnvironment = std::move(mEnvironment->mEnclosingEnvironment);
+    mEnvironment = std::move(oldEnvironment);
 }
 
 void Interpreter::Visit(StatementIf* ifStatement)
@@ -106,6 +105,21 @@ void Interpreter::Visit(StatementWhile* whileStatement)
     while (IsTrue(Evaluate(whileStatement->mCondition.get()))) {
         whileStatement->mBody->Accept(this);
     }
+}
+
+void Interpreter::Visit(StatementFunction* function)
+{
+    mEnvironment->Define(function->mIdentifier->mLexeme,
+        Object(std::static_pointer_cast<ICallable>(std::make_shared<Function>(fmt::format("<fun {}>", function->mIdentifier->mLexeme),
+            std::move(function->mParameters), function->mParameters.size(), std::move(function->mBody)))));
+}
+
+void Interpreter::Visit(StatementReturn* returnStatement)
+{
+    if (returnStatement->mExpression != nullptr) {
+        returnStatement->mExpression->Accept(this);
+    }
+    throw ReturnException {};
 }
 
 void Interpreter::Visit(IExpression* expression)
@@ -247,6 +261,28 @@ void Interpreter::Visit(ExpressionAssignment* assignment)
 {
     mResult = Evaluate(assignment->mValue.get());
     mEnvironment->Assign(assignment->mName->mLexeme, mResult);
+}
+
+void Interpreter::Visit(ExpressionCall* call)
+{
+    Object callee { Evaluate(call->mCallee.get()) };
+
+    std::vector<Object> arguments;
+    for (auto& expr : call->mArguments) {
+        arguments.push_back(Evaluate(expr.get()));
+    }
+
+    if (!std::holds_alternative<std::shared_ptr<ICallable>>(callee.mData)) {
+        throw ParserException("Callee must be a callable function");
+    }
+
+    ICallable* function = std::get<std::shared_ptr<ICallable>>(callee.mData).get();
+
+    if (arguments.size() != function->Arity()) {
+        throw ParserException(fmt::format("Expected {} arguments but received {}", function->Arity(), arguments.size()));
+    }
+
+    mResult = function->Call(this, arguments);
 }
 
 }

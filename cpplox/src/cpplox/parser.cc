@@ -5,10 +5,10 @@
 
 #include <initializer_list>
 #include <memory>
-#include <vector>
 #include <optional>
 #include <spdlog/spdlog.h>
 #include <utility>
+#include <vector>
 
 namespace cpplox {
 
@@ -33,8 +33,54 @@ std::unique_ptr<IStatement> Parser::Declaration()
     if (Match({ Token::Type::kVar })) {
         Next();
         return DeclarationVariable();
+    } else if (Match({ Token::Type::kFun })) {
+        Next();
+        return DeclarationFunction();
     }
     return Statement();
+}
+
+std::unique_ptr<IStatement> Parser::DeclarationFunction()
+{
+    std::unique_ptr<Token> identifier = std::make_unique<Token>(*Peek());
+    Next();
+
+    if (identifier->mType != Token::Type::kIdentifier) {
+        throw ParserException("Expected identifier name after keyword fun");
+    }
+
+    if (!Match({ Token::Type::kLeftParen })) {
+        throw ParserException("Expected left parentheses after function name");
+    }
+    Next();
+
+    std::vector<std::unique_ptr<Token>> parameters;
+    if (Match({ Token::Type::kRightParen })) {
+        Next();
+    } else {
+        for (;;) {
+            if (Peek()->mType != Token::Type::kIdentifier) {
+                throw ParserException("Function parameters should be identifiers");
+            }
+
+            parameters.push_back(std::make_unique<Token>(*Peek()));
+            Next();
+
+            if (Match({ Token::Type::kRightParen })) {
+                Next();
+                break;
+            } else if (Match({ Token::Type::kComma })) {
+                Next();
+            } else {
+                throw ParserException("Unknown delimeter in function argument list");
+            }
+        }
+    }
+
+    if (!Match({ Token::Type::kLeftBrace })) {
+        throw ParserException("Expected left brace before function body");
+    }
+    return std::make_unique<StatementFunction>(std::move(identifier), std::move(parameters), Statement());
 }
 
 std::unique_ptr<IStatement> Parser::DeclarationVariable()
@@ -84,6 +130,11 @@ std::unique_ptr<IStatement> Parser::Statement()
         Next();
 
         return std::make_unique<StatementBlock>(std::move(block));
+    }
+
+    if (Match({ Token::Type::kReturn })) {
+        Next();
+        return Return();
     }
 
     if (Match({ Token::Type::kIf })) {
@@ -214,7 +265,7 @@ std::unique_ptr<IStatement> Parser::For()
     if (condition == nullptr) {
         condition = std::make_unique<ExpressionObject>(Object(true));
     }
-    
+
     body = std::make_unique<StatementWhile>(std::move(condition), std::move(body));
 
     if (initializer != nullptr) {
@@ -225,6 +276,20 @@ std::unique_ptr<IStatement> Parser::For()
         body = std::make_unique<StatementBlock>(std::move(arg));
     }
     return body;
+}
+
+std::unique_ptr<IStatement> Parser::Return()
+{
+    if (Match({ Token::Type::kSemicolon })) {
+        Next();
+        return std::make_unique<StatementReturn>();
+    }
+    std::unique_ptr<IStatement> ret = std::make_unique<StatementReturn>(Expression());
+    if (!Match({ Token::Type::kSemicolon })) {
+        throw ParserException("Expected semicolon after retun");
+    }
+    Next();
+    return ret;
 }
 
 std::unique_ptr<IExpression> Parser::Expression()
@@ -336,7 +401,37 @@ std::unique_ptr<IExpression> Parser::Unary()
         Next();
         return std::make_unique<ExpressionUnary>(std::move(op), Unary());
     }
-    return Primary();
+    return Call();
+}
+
+std::unique_ptr<IExpression> Parser::Call()
+{
+    std::unique_ptr<IExpression> expression = Primary();
+
+    while (Match({ Token::Type::kLeftParen })) {
+        std::vector<std::unique_ptr<IExpression>> arguments;
+
+        do {
+            Next();
+            if (Match({ Token::Type::kRightParen }))
+                break;
+
+            arguments.push_back(Expression());
+        } while (Match({ Token::Type::kComma }));
+
+        if (!Match({ Token::Type::kRightParen })) {
+            throw ParserException("Expected ) after arguments");
+        }
+        Next();
+
+        if (arguments.size() > 255) {
+            throw ParserException("Cannot have more than 255 arguments");
+        }
+
+        expression = std::make_unique<ExpressionCall>(std::move(expression), std::move(arguments));
+    }
+
+    return expression;
 }
 
 std::unique_ptr<IExpression> Parser::Primary()
