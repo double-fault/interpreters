@@ -18,9 +18,9 @@ Parser::Parser(const std::vector<Token>& tokens)
     mTokens.pop_back(); // Get rid of EOF token
 }
 
-std::vector<std::unique_ptr<IStatement>> Parser::Parse()
+std::vector<std::shared_ptr<IStatement>> Parser::Parse()
 {
-    std::vector<std::unique_ptr<IStatement>> statements;
+    std::vector<std::shared_ptr<IStatement>> statements;
     while (mIterator != mTokens.end()) {
         statements.push_back(Declaration());
     }
@@ -80,7 +80,15 @@ std::unique_ptr<IStatement> Parser::DeclarationFunction()
     if (!Match({ Token::Type::kLeftBrace })) {
         throw ParserException("Expected left brace before function body");
     }
-    return std::make_unique<StatementFunction>(std::move(identifier), std::move(parameters), Statement());
+    Next();
+
+    std::vector<std::unique_ptr<IStatement>> body;
+    while (!Match({ Token::Type::kRightBrace })) {
+        body.push_back(Declaration());
+    }
+    Next();
+
+    return std::make_unique<StatementFunction>(std::move(identifier), std::move(parameters), std::move(body));
 }
 
 std::unique_ptr<IStatement> Parser::DeclarationVariable()
@@ -91,7 +99,7 @@ std::unique_ptr<IStatement> Parser::DeclarationVariable()
     std::unique_ptr<Token> name = std::make_unique<Token>(*Peek());
     Next();
 
-    std::optional<std::unique_ptr<IExpression>> initializer { std::nullopt };
+    std::unique_ptr<IExpression> initializer { nullptr };
     if (Match({ Token::Type::kEqual })) {
         Next();
         initializer = Expression();

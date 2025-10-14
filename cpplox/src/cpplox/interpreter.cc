@@ -1,9 +1,9 @@
 #include "interpreter.h"
 #include "ast.h"
+#include "environment.h"
 #include "function.h"
 #include "icallable.h"
 #include "object.h"
-#include "parser.h"
 #include "token.h"
 
 #include <iostream>
@@ -15,9 +15,10 @@
 
 namespace cpplox {
 
-Interpreter::Interpreter(std::vector<std::unique_ptr<IStatement>>&& statements)
-    : mStatements { std::move(statements) }
-    , mEnvironment { std::make_unique<Environment>() }
+Interpreter::Interpreter(const std::vector<std::shared_ptr<IStatement>>& statements)
+    : mStatements { statements }
+    , mGlobals { std::make_shared<Environment>() }
+    , mEnvironment { mGlobals }
 {
 }
 
@@ -27,6 +28,25 @@ void Interpreter::Run()
         if (statement != nullptr)
             statement->Accept(this);
     }
+}
+
+void Interpreter::Resolve(IExpression* expression, int depth)
+{
+    mResolvedLocals[expression] = depth;
+}
+
+Environment* Interpreter::ResolutionLookup(IExpression* expression)
+{
+    if (mResolvedLocals.find(expression) == mResolvedLocals.end()) {
+        return mGlobals.get();
+    }
+    int depth = mResolvedLocals[expression];
+
+    Environment* environment { mEnvironment.get() };
+    while (depth--) {
+        environment = environment->mEnclosingEnvironment;
+    }
+    return environment;
 }
 
 bool Interpreter::IsTrue(const Object& object)
@@ -73,21 +93,21 @@ void Interpreter::Visit(StatementPrint* print)
 void Interpreter::Visit(StatementVariable* variable)
 {
     Object initializer {};
-    if (variable->mInitializer.has_value()) {
-        initializer = Evaluate(variable->mInitializer.value().get());
+    if (variable->mInitializer != nullptr) {
+        initializer = Evaluate(variable->mInitializer.get());
     }
     mEnvironment->Define(variable->mName->mLexeme, initializer);
 }
 
 void Interpreter::Visit(StatementBlock* block)
 {
-    std::unique_ptr<Environment> oldEnvironment = std::move(mEnvironment);
-    mEnvironment = std::make_unique<Environment>(oldEnvironment.get());
-    for (auto& statement : block->mBlock) {
+    std::shared_ptr<Environment> oldEnvironment = mEnvironment;
+    mEnvironment = std::make_shared<Environment>(oldEnvironment.get());
+    for (auto& statement : block->mStatements) {
         if (statement != nullptr)
             statement->Accept(this);
     }
-    mEnvironment = std::move(oldEnvironment);
+    mEnvironment = oldEnvironment;
 }
 
 void Interpreter::Visit(StatementIf* ifStatement)
@@ -110,8 +130,13 @@ void Interpreter::Visit(StatementWhile* whileStatement)
 void Interpreter::Visit(StatementFunction* function)
 {
     mEnvironment->Define(function->mIdentifier->mLexeme,
-        Object(std::static_pointer_cast<ICallable>(std::make_shared<Function>(fmt::format("<fun {}>", function->mIdentifier->mLexeme),
-            std::move(function->mParameters), function->mParameters.size(), std::move(function->mBody)))));
+        Object(std::static_pointer_cast<ICallable>(
+            std::make_shared<Function>(
+                fmt::format("<fun {}>", function->mIdentifier->mLexeme),
+                mEnvironment,
+                std::move(function->mParameters),
+                function->mParameters.size(),
+                std::move(function->mBody)))));
 }
 
 void Interpreter::Visit(StatementReturn* returnStatement)
@@ -152,7 +177,7 @@ void Interpreter::Visit(ExpressionUnary* unary)
         break;
 
     default:
-        throw ParserException("Interpreter internal error while interpreting type ExpressionUnary");
+        throw InterpreterException("Interpreter internal error while interpreting type ExpressionUnary");
     }
 }
 
@@ -178,7 +203,7 @@ void Interpreter::Visit(ExpressionLogical* logical)
         break;
 
     default:
-        throw ParserException("Interpreter internal error while interpreting ExpressionLogical");
+        throw InterpreterException("Interpreter internal error while interpreting ExpressionLogical");
     }
 }
 
@@ -196,7 +221,7 @@ void Interpreter::Visit(ExpressionBinary* binary)
     case Token::Type::kSlash:
         AssertType<double>(left, right);
         if (std::get<double>(right.mData) == 0) {
-            throw ParserException("Divide by zero");
+            throw InterpreterException("Divide by zero");
         }
 
         mResult = Object(std::get<double>(left.mData) / std::get<double>(right.mData));
@@ -248,19 +273,21 @@ void Interpreter::Visit(ExpressionBinary* binary)
         break;
 
     default:
-        throw ParserException("Interpreter internal error while interpreting type ExpressionBinary");
+        throw InterpreterException("Interpreter internal error while interpreting type ExpressionBinary");
     }
 }
 
 void Interpreter::Visit(ExpressionVariable* variable)
 {
-    mResult = *mEnvironment->Get(variable->mName->mLexeme);
+    mResult = *(ResolutionLookup(static_cast<IExpression*>(variable))
+            ->Get(variable->mName->mLexeme));
 }
 
 void Interpreter::Visit(ExpressionAssignment* assignment)
 {
     mResult = Evaluate(assignment->mValue.get());
-    mEnvironment->Assign(assignment->mName->mLexeme, mResult);
+    ResolutionLookup(static_cast<IExpression*>(assignment))
+        ->Assign(assignment->mName->mLexeme, mResult);
 }
 
 void Interpreter::Visit(ExpressionCall* call)
@@ -273,13 +300,13 @@ void Interpreter::Visit(ExpressionCall* call)
     }
 
     if (!std::holds_alternative<std::shared_ptr<ICallable>>(callee.mData)) {
-        throw ParserException("Callee must be a callable function");
+        throw InterpreterException("Callee must be a callable function");
     }
 
     ICallable* function = std::get<std::shared_ptr<ICallable>>(callee.mData).get();
 
     if (arguments.size() != function->Arity()) {
-        throw ParserException(fmt::format("Expected {} arguments but received {}", function->Arity(), arguments.size()));
+        throw InterpreterException(fmt::format("Expected {} arguments but received {}", function->Arity(), arguments.size()));
     }
 
     mResult = function->Call(this, arguments);

@@ -3,8 +3,8 @@
 #include "object.h"
 #include "token.h"
 
+#include <cassert>
 #include <memory>
-#include <optional>
 #include <vector>
 
 // TODO: Replace passing Tokens into AST nodes with more specific items - variable name (std::string), operator type, etc.
@@ -111,7 +111,7 @@ public:
 
 class StatementVariable final : public IStatement {
 public:
-    StatementVariable(std::unique_ptr<Token> name, std::optional<std::unique_ptr<IExpression>> initializer = std::nullopt)
+    StatementVariable(std::unique_ptr<Token> name, std::unique_ptr<IExpression> initializer = nullptr)
         : mName { std::move(name) }
         , mInitializer { std::move(initializer) }
     {
@@ -123,13 +123,13 @@ public:
     }
 
     std::unique_ptr<Token> mName;
-    std::optional<std::unique_ptr<IExpression>> mInitializer;
+    std::unique_ptr<IExpression> mInitializer;
 };
 
 class StatementBlock final : public IStatement {
 public:
     StatementBlock(std::vector<std::unique_ptr<IStatement>> block)
-        : mBlock { std::move(block) }
+        : mStatements { std::move(block) }
     {
     }
 
@@ -138,7 +138,7 @@ public:
         visitor->Visit(this);
     }
 
-    std::vector<std::unique_ptr<IStatement>> mBlock;
+    std::vector<std::unique_ptr<IStatement>> mStatements;
 };
 
 class StatementIf final : public IStatement {
@@ -149,6 +149,7 @@ public:
         , mThenStatement { std::move(thenStatement) }
         , mElseStatement { std::move(elseStatement) }
     {
+        assert(mThenStatement != nullptr);
     }
 
     void Accept(IStatementVisitor* visitor) override
@@ -181,7 +182,7 @@ public:
 class StatementFunction final : public IStatement {
 public:
     StatementFunction(std::unique_ptr<Token> identifier, std::vector<std::unique_ptr<Token>> parameters,
-        std::unique_ptr<IStatement> body)
+        std::vector<std::unique_ptr<IStatement>> body)
         : mIdentifier { std::move(identifier) }
         , mParameters { std::move(parameters) }
         , mBody { std::move(body) }
@@ -195,7 +196,7 @@ public:
 
     std::unique_ptr<Token> mIdentifier;
     std::vector<std::unique_ptr<Token>> mParameters;
-    std::unique_ptr<IStatement> mBody;
+    std::vector<std::unique_ptr<IStatement>> mBody;
 };
 
 class StatementReturn final : public IStatement {

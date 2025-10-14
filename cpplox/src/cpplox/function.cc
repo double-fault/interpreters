@@ -4,9 +4,11 @@
 
 namespace cpplox {
 
-Function::Function(const std::string& name, std::vector<std::unique_ptr<Token>> parameters,
-    const int arity, std::unique_ptr<IStatement> body)
+Function::Function(const std::string& name, std::shared_ptr<Environment> closure,
+    std::vector<std::unique_ptr<Token>> parameters, const int arity,
+    std::vector<std::unique_ptr<IStatement>> body)
     : mName { name }
+    , mClosure { closure }
     , mParameters { std::move(parameters) }
     , mArity { arity }
     , mBody { std::move(body) }
@@ -15,19 +17,22 @@ Function::Function(const std::string& name, std::vector<std::unique_ptr<Token>> 
 
 Object Function::Call(Interpreter* interpreter, std::vector<Object> arguments)
 {
-    std::unique_ptr<Environment> oldEnvironment = std::move(interpreter->mEnvironment);
-    interpreter->mEnvironment = std::make_unique<Environment>(oldEnvironment.get());
+    std::shared_ptr<Environment> oldEnvironment = interpreter->mEnvironment;
+    interpreter->mEnvironment = std::make_shared<Environment>(mClosure.get());
+
     for (int i = 0; i < mArity; i++) {
         interpreter->mEnvironment->Define(mParameters[i]->mLexeme, arguments[i]);
     }
 
     try {
-        mBody->Accept(interpreter);
+        for (auto& statement : mBody) {
+            statement->Accept(interpreter);
+        }
     } catch (const Interpreter::ReturnException& exception) {
         ;
     }
 
-    interpreter->mEnvironment = std::move(oldEnvironment);
+    interpreter->mEnvironment = oldEnvironment;
     return interpreter->GetResult();
 }
 

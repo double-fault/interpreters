@@ -15,8 +15,16 @@
 
 namespace cpplox {
 
-class Interpreter : public IExpressionVisitor,
-                    public IStatementVisitor {
+class InterpreterException final : public std::runtime_error {
+public:
+    InterpreterException(const std::string& error)
+        : std::runtime_error { error }
+    {
+    }
+};
+
+class Interpreter final : public IExpressionVisitor,
+                          public IStatementVisitor {
 public:
     class ReturnException final : public std::runtime_error {
     public:
@@ -26,8 +34,11 @@ public:
         }
     };
 
-    Interpreter(std::vector<std::unique_ptr<IStatement>>&&);
+    Interpreter(const std::vector<std::shared_ptr<IStatement>>&);
     void Run();
+
+    void Resolve(IExpression*, int);
+    Environment* ResolutionLookup(IExpression*);
 
     void Visit(IStatement*) override;
     void Visit(StatementExpression*) override;
@@ -51,7 +62,8 @@ public:
 
     Object GetResult();
 
-    std::unique_ptr<Environment> mEnvironment;
+    std::shared_ptr<Environment> mGlobals;
+    std::shared_ptr<Environment> mEnvironment;
 
 private:
     Object Evaluate(IExpression*);
@@ -74,7 +86,8 @@ private:
         ((void)AssertTypeSingle<T...>(objects), ...);
     }
 
-    std::vector<std::unique_ptr<IStatement>> mStatements;
+    std::vector<std::shared_ptr<IStatement>> mStatements;
+    std::map<IExpression*, int> mResolvedLocals;
 
     Object mResult;
 };

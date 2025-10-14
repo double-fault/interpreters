@@ -22,7 +22,7 @@ class Parser final {
 public:
     Parser(const std::vector<Token>&);
 
-    std::vector<std::unique_ptr<IStatement>> Parse();
+    std::vector<std::shared_ptr<IStatement>> Parse();
 
 private:
     std::unique_ptr<IStatement> Declaration();
