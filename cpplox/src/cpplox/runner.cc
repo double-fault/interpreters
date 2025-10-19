@@ -1,11 +1,9 @@
 #include "runner.h"
-#include "ast_printer.h"
 #include "interpreter.h"
 #include "parser.h"
 #include "resolver.h"
 #include "scanner.h"
 
-#include <iostream>
 #include <memory>
 #include <spdlog/spdlog.h>
 
@@ -29,18 +27,14 @@ void Runner::Run(std::string_view source)
     spdlog::info("Parsing tokens..");
 
     Parser parser(tokens);
-    std::vector<std::shared_ptr<IStatement>> statements = parser.Parse();
+    std::vector<std::unique_ptr<IStatement>> statements = parser.Parse();
 
-    /*
-    spdlog::info("Printing AST..");
+    std::vector<IStatement*> statementsPointer;
+    for (auto& statement : statements)
+        statementsPointer.push_back(statement.get());
 
-    AstPrinter printer {};
-    printer.Visit(ptr.get());
-    std::cout << printer.GetResult() << "\n";
-    */
-
-    Interpreter interpreter(statements);
-    Resolver resolver(&interpreter, statements);
+    Interpreter interpreter(statementsPointer);
+    Resolver resolver(&interpreter, statementsPointer);
 
     spdlog::info("Resolving..");
     resolver.Resolve();

@@ -8,10 +8,11 @@
 namespace cpplox {
 
 Resolver::Resolver(Interpreter* interpreter,
-    const std::vector<std::shared_ptr<IStatement>>& statements)
+    const std::vector<IStatement*>& statements)
     : mInterpreter { interpreter }
     , mStatements { statements }
     , mCurrentFunction { FunctionType::kNone }
+    , mCurrentClass { ClassType::kNone }
 {
 }
 
@@ -27,22 +28,22 @@ void Resolver::StartScope()
     mScopes.push_back(std::map<std::string, bool> {});
 }
 
-void Resolver::Declare(Token* identifier)
+void Resolver::Declare(const std::string& name)
 {
     if (!mScopes.empty()) {
         auto& scope { mScopes.back() };
-        if (scope.find(identifier->mLexeme) != scope.end()) {
+        if (scope.find(name) != scope.end()) {
             throw ResolverException(fmt::format("Variable with name '{}' already exists in scope",
-                identifier->mLexeme));
+                name));
         }
-        scope[identifier->mLexeme] = false;
+        scope[name] = false;
     }
 }
 
-void Resolver::Define(Token* identifier)
+void Resolver::Define(const std::string& name)
 {
     if (!mScopes.empty())
-        mScopes.back()[identifier->mLexeme] = true;
+        mScopes.back()[name] = true;
 }
 
 void Resolver::EndScope()
@@ -70,11 +71,11 @@ void Resolver::Visit(StatementPrint* print)
 
 void Resolver::Visit(StatementVariable* variable)
 {
-    Declare(variable->mName.get());
+    Declare(variable->mName);
     if (variable->mInitializer != nullptr) {
         variable->mInitializer->Accept(this);
     }
-    Define(variable->mName.get());
+    Define(variable->mName);
 }
 
 void Resolver::Visit(StatementBlock* block)
@@ -104,17 +105,24 @@ void Resolver::Visit(StatementWhile* statement)
 
 void Resolver::Visit(StatementFunction* function)
 {
-    Declare(function->mIdentifier.get());
-    Define(function->mIdentifier.get());
+    Declare(function->mIdentifier);
+    Define(function->mIdentifier);
 
     StartScope();
     for (auto& parameter : function->mParameters) {
-        Declare(parameter.get());
-        Define(parameter.get());
+        Declare(parameter);
+        Define(parameter);
     }
 
     FunctionType oldType = mCurrentFunction;
     mCurrentFunction = FunctionType::kFunction;
+    if (oldType == FunctionType::kMethod) {
+        if (function->mIdentifier != "init") {
+            mCurrentFunction = FunctionType::kMethod;
+        } else {
+            mCurrentFunction = FunctionType::kInitializer;
+        }
+    }
     for (auto& statement : function->mBody) {
         statement->Accept(this);
     }
@@ -125,13 +133,43 @@ void Resolver::Visit(StatementFunction* function)
 
 void Resolver::Visit(StatementReturn* statement)
 {
-    if (mCurrentFunction != FunctionType::kFunction) {
+    if (mCurrentFunction == FunctionType::kInitializer) {
+        throw ResolverException("Cannot return fron constructor");
+    }
+
+    if (mCurrentFunction != FunctionType::kFunction && mCurrentFunction != FunctionType::kMethod) {
         throw ResolverException("Cannot return from outside a function");
     }
 
     if (statement->mExpression != nullptr) {
         statement->mExpression->Accept(this);
     }
+}
+
+void Resolver::Visit(StatementClass* klass)
+{
+    Declare(klass->mIdentifier);
+    Define(klass->mIdentifier);
+
+    ClassType oldClassType = mCurrentClass;
+    FunctionType oldFunctionType = mCurrentFunction;
+    mCurrentClass = ClassType::kClass;
+    mCurrentFunction = FunctionType::kMethod;
+
+    StartScope();
+    StartScope();
+    Declare("this");
+    Define("this");
+
+    for (auto& method : klass->mMethods) {
+        method->Accept(this);
+    }
+
+    EndScope();
+    EndScope();
+
+    mCurrentClass = oldClassType;
+    mCurrentFunction = oldFunctionType;
 }
 
 void Resolver::Visit(IExpression* expression)
@@ -167,7 +205,7 @@ void Resolver::Visit(ExpressionUnary* unary)
 
 void Resolver::Visit(ExpressionVariable* variable)
 {
-    std::string name = variable->mName->mLexeme;
+    std::string name = variable->mName;
     int depth { 0 };
     for (auto& scope : std::ranges::views::reverse(mScopes)) {
         if (scope.find(name) != scope.end()) {
@@ -183,7 +221,7 @@ void Resolver::Visit(ExpressionVariable* variable)
 
 void Resolver::Visit(ExpressionAssignment* assignment)
 {
-    std::string name = assignment->mName->mLexeme;
+    std::string name = assignment->mName;
     int depth { 0 };
     for (auto& scope : std::ranges::views::reverse(mScopes)) {
         if (scope.find(name) != scope.end()) {
@@ -204,6 +242,33 @@ void Resolver::Visit(ExpressionCall* call)
     call->mCallee->Accept(this);
     for (auto& argument : call->mArguments) {
         argument->Accept(this);
+    }
+}
+
+void Resolver::Visit(ExpressionGet* get)
+{
+    get->mObject->Accept(this);
+}
+
+void Resolver::Visit(ExpressionSet* set)
+{
+    set->mObject->Accept(this);
+    set->mValue->Accept(this);
+}
+
+void Resolver::Visit(ExpressionThis* expression)
+{
+    if (mCurrentFunction != FunctionType::kMethod && mCurrentFunction != FunctionType::kInitializer) {
+        throw ResolverException("Keyword 'this' can only be used inside methods");
+    }
+
+    int depth { 0 };
+    for (auto& scope : std::ranges::views::reverse(mScopes)) {
+        if (scope.find("this") != scope.end()) {
+            mInterpreter->Resolve(expression, depth);
+            break;
+        }
+        depth++;
     }
 }
 

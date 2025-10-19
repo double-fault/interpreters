@@ -34,7 +34,7 @@ public:
         }
     };
 
-    Interpreter(const std::vector<std::shared_ptr<IStatement>>&);
+    Interpreter(const std::vector<IStatement*>&);
     void Run();
 
     void Resolve(IExpression*, int);
@@ -49,6 +49,7 @@ public:
     void Visit(StatementWhile*) override;
     void Visit(StatementFunction*) override;
     void Visit(StatementReturn*) override;
+    void Visit(StatementClass*) override;
 
     void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
@@ -59,6 +60,9 @@ public:
     void Visit(ExpressionVariable*) override;
     void Visit(ExpressionAssignment*) override;
     void Visit(ExpressionCall*) override;
+    void Visit(ExpressionGet*) override;
+    void Visit(ExpressionSet*) override;
+    void Visit(ExpressionThis*) override;
 
     Object GetResult();
 
@@ -86,7 +90,7 @@ private:
         ((void)AssertTypeSingle<T...>(objects), ...);
     }
 
-    std::vector<std::shared_ptr<IStatement>> mStatements;
+    std::vector<IStatement*> mStatements;
     std::map<IExpression*, int> mResolvedLocals;
 
     Object mResult;

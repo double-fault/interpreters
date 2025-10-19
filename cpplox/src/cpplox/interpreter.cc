@@ -1,8 +1,8 @@
 #include "interpreter.h"
 #include "ast.h"
+#include "class.h"
 #include "environment.h"
 #include "function.h"
-#include "icallable.h"
 #include "object.h"
 #include "token.h"
 
@@ -15,7 +15,7 @@
 
 namespace cpplox {
 
-Interpreter::Interpreter(const std::vector<std::shared_ptr<IStatement>>& statements)
+Interpreter::Interpreter(const std::vector<IStatement*>& statements)
     : mStatements { statements }
     , mGlobals { std::make_shared<Environment>() }
     , mEnvironment { mGlobals }
@@ -44,7 +44,7 @@ Environment* Interpreter::ResolutionLookup(IExpression* expression)
 
     Environment* environment { mEnvironment.get() };
     while (depth--) {
-        environment = environment->mEnclosingEnvironment;
+        environment = environment->mEnclosingEnvironment.get();
     }
     return environment;
 }
@@ -96,17 +96,18 @@ void Interpreter::Visit(StatementVariable* variable)
     if (variable->mInitializer != nullptr) {
         initializer = Evaluate(variable->mInitializer.get());
     }
-    mEnvironment->Define(variable->mName->mLexeme, initializer);
+    mEnvironment->Define(variable->mName, initializer);
 }
 
 void Interpreter::Visit(StatementBlock* block)
 {
     std::shared_ptr<Environment> oldEnvironment = mEnvironment;
-    mEnvironment = std::make_shared<Environment>(oldEnvironment.get());
+    mEnvironment = std::make_shared<Environment>(oldEnvironment);
     for (auto& statement : block->mStatements) {
         if (statement != nullptr)
             statement->Accept(this);
     }
+    mEnvironment->Release();
     mEnvironment = oldEnvironment;
 }
 
@@ -129,14 +130,17 @@ void Interpreter::Visit(StatementWhile* whileStatement)
 
 void Interpreter::Visit(StatementFunction* function)
 {
-    mEnvironment->Define(function->mIdentifier->mLexeme,
-        Object(std::static_pointer_cast<ICallable>(
-            std::make_shared<Function>(
-                fmt::format("<fun {}>", function->mIdentifier->mLexeme),
-                mEnvironment,
-                std::move(function->mParameters),
-                function->mParameters.size(),
-                std::move(function->mBody)))));
+    std::vector<IStatement*> body;
+    for (auto& statement : function->mBody) {
+        body.push_back(statement.get());
+    }
+    mResult = Object(std::make_shared<Function>(
+        function->mIdentifier,
+        mEnvironment,
+        function->mParameters,
+        function->mParameters.size(),
+        body));
+    mEnvironment->Define(function->mIdentifier, mResult);
 }
 
 void Interpreter::Visit(StatementReturn* returnStatement)
@@ -145,6 +149,27 @@ void Interpreter::Visit(StatementReturn* returnStatement)
         returnStatement->mExpression->Accept(this);
     }
     throw ReturnException {};
+}
+
+void Interpreter::Visit(StatementClass* klass)
+{
+    std::shared_ptr<Environment> oldEnvironment = mEnvironment;
+    mEnvironment = std::make_shared<Environment>(oldEnvironment);
+
+    std::map<std::string, Object> methods;
+    for (auto& method : klass->mMethods) {
+        method->Accept(this);
+
+        if (!std::holds_alternative<std::shared_ptr<ICallable>>(mResult.mData)) {
+            throw InterpreterException("Internal error - class method is not a method");
+        }
+        methods[std::get<std::shared_ptr<ICallable>>(mResult.mData)->ToString()] = mResult;
+    }
+
+    mEnvironment->Release();
+    mEnvironment = oldEnvironment;
+
+    mEnvironment->Define(klass->mIdentifier, std::make_shared<Klass>(klass->mIdentifier, mEnvironment, methods));
 }
 
 void Interpreter::Visit(IExpression* expression)
@@ -166,7 +191,7 @@ void Interpreter::Visit(ExpressionUnary* unary)
 {
     mResult = Evaluate(unary->mExpression.get());
 
-    switch (unary->mOperator->mType) {
+    switch (unary->mOperator) {
     case Token::Type::kMinus:
         AssertType<double>(mResult);
         mResult.mData = -std::get<double>(mResult.mData);
@@ -185,7 +210,7 @@ void Interpreter::Visit(ExpressionLogical* logical)
 {
     Object left = Evaluate(logical->mLeft.get());
 
-    switch (logical->mOperator->mType) {
+    switch (logical->mOperator) {
     case Token::Type::kOr:
         if (IsTrue(left)) {
             mResult = left;
@@ -212,7 +237,7 @@ void Interpreter::Visit(ExpressionBinary* binary)
     Object left = Evaluate(binary->mLeft.get());
     Object right = Evaluate(binary->mRight.get());
 
-    switch (binary->mOperator->mType) {
+    switch (binary->mOperator) {
     case Token::Type::kMinus:
         AssertType<double>(left, right);
         mResult = Object(std::get<double>(left.mData) - std::get<double>(right.mData));
@@ -279,15 +304,15 @@ void Interpreter::Visit(ExpressionBinary* binary)
 
 void Interpreter::Visit(ExpressionVariable* variable)
 {
-    mResult = *(ResolutionLookup(static_cast<IExpression*>(variable))
-            ->Get(variable->mName->mLexeme));
+    mResult = ResolutionLookup(static_cast<IExpression*>(variable))
+                  ->Get(variable->mName);
 }
 
 void Interpreter::Visit(ExpressionAssignment* assignment)
 {
     mResult = Evaluate(assignment->mValue.get());
     ResolutionLookup(static_cast<IExpression*>(assignment))
-        ->Assign(assignment->mName->mLexeme, mResult);
+        ->Assign(assignment->mName, mResult);
 }
 
 void Interpreter::Visit(ExpressionCall* call)
@@ -303,13 +328,40 @@ void Interpreter::Visit(ExpressionCall* call)
         throw InterpreterException("Callee must be a callable function");
     }
 
-    ICallable* function = std::get<std::shared_ptr<ICallable>>(callee.mData).get();
+    std::shared_ptr<ICallable> callable = std::get<std::shared_ptr<ICallable>>(callee.mData);
 
-    if (arguments.size() != function->Arity()) {
-        throw InterpreterException(fmt::format("Expected {} arguments but received {}", function->Arity(), arguments.size()));
+    if (arguments.size() != callable->Arity()) {
+        throw InterpreterException(fmt::format("Expected {} arguments but received {}", callable->Arity(), arguments.size()));
     }
 
-    mResult = function->Call(this, arguments);
+    mResult = callable->Call(this, arguments);
+}
+
+void Interpreter::Visit(ExpressionGet* get)
+{
+    Object object = Evaluate(get->mObject.get());
+    if (!std::holds_alternative<std::shared_ptr<Instance>>(object.mData)) {
+        throw InterpreterException("Cannot get, only instances have properties");
+    }
+
+    mResult = std::get<std::shared_ptr<Instance>>(object.mData)->Get(get->mName);
+}
+
+void Interpreter::Visit(ExpressionSet* set)
+{
+    Object object = Evaluate(set->mObject.get());
+    if (!std::holds_alternative<std::shared_ptr<Instance>>(object.mData)) {
+        throw InterpreterException("Cannot set, only instances have properties");
+    }
+
+    Object value = Evaluate(set->mValue.get());
+
+    std::get<std::shared_ptr<Instance>>(object.mData)->Set(set->mName, value);
+}
+
+void Interpreter::Visit(ExpressionThis* expressionThis)
+{
+    mResult = ResolutionLookup(expressionThis)->Get("this");
 }
 
 }

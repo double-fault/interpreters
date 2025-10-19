@@ -1,6 +1,7 @@
 #pragma once
 
 #include "icallable.h"
+#include "instance.h"
 
 #include <memory>
 #include <string>
@@ -25,8 +26,7 @@ struct Object {
 
     friend std::ostream& operator<<(std::ostream& out, const Object& token);
 
-    // I'd like to keep Object copyable, hence the callable is a shared_ptr instead of a unique_ptr
-    std::variant<std::monostate, double, bool, std::string, std::shared_ptr<ICallable>> mData;
+    std::variant<std::monostate, double, bool, std::string, std::shared_ptr<ICallable>, std::shared_ptr<Instance>> mData;
 };
 
 }

@@ -1,9 +1,7 @@
 #include "object.h"
-#include "icallable.h"
 
 #include <boost/type_index.hpp>
 #include <fmt/format.h>
-#include <magic_enum/magic_enum.hpp>
 #include <ostream>
 #include <variant>
 
@@ -17,7 +15,9 @@ std::string Object::ToString() const
             if constexpr (std::is_same_v<std::monostate, T>) {
                 return fmt::format("{}= Nil", boost::typeindex::type_id<T>().pretty_name());
             } else if constexpr (std::is_same_v<std::shared_ptr<ICallable>, T>) {
-                return fmt::format("fun= {}", data->ToString());
+                return fmt::format("callable= {}", data->ToString());
+            } else if constexpr (std::is_same_v<std::shared_ptr<Instance>, T>) {
+                return fmt::format("instance= {}", data->ToString());
             } else {
                 return fmt::format("{}= {}", boost::typeindex::type_id<T>().pretty_name(),
                     data);

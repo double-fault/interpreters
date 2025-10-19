@@ -1,20 +1,23 @@
 #pragma once
 
-#include "ast.h"
-#include "environment.h"
 #include "icallable.h"
 
+#include <map>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace cpplox {
 
-class Function final : public ICallable,
-                       public std::enable_shared_from_this<Function> {
+struct Object;
+class Interpreter;
+
+class Klass final : public ICallable,
+                    public std::enable_shared_from_this<Klass> {
 public:
-    Function(const std::string& name, std::shared_ptr<Environment> closure,
-        const std::vector<std::string>& parameters, const int arity,
-        const std::vector<IStatement*>& body);
+    Klass(const std::string& name, std::shared_ptr<Environment> closure,
+        std::map<std::string, Object> methods);
 
     Object Call(Interpreter* interpreter, std::vector<Object> arguments) override;
     int Arity() const override;
@@ -22,14 +25,13 @@ public:
     void Capture() override;
     void Release() override;
     Object Bind(std::shared_ptr<Instance> instance) override;
+    std::optional<Object> FindMethod(const std::string& name) const;
 
 private:
     const std::string mName;
     std::shared_ptr<Environment> mEnvironmentCapture;
     std::weak_ptr<Environment> mClosure;
-    std::vector<std::string> mParameters;
-    const int mArity;
-    std::vector<IStatement*> mBody;
+    std::map<std::string, Object> mMethods;
 };
 
 }

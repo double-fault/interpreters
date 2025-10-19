@@ -7,7 +7,9 @@
 #include <memory>
 #include <vector>
 
-// TODO: Replace passing Tokens into AST nodes with more specific items - variable name (std::string), operator type, etc.
+// TODO: For proper error handling, you'd want to note the location of the corresponding token
+// with each AST node. Create some small new struct and add it as a field to every AST node?
+// Anything requiring less labor? Like some neat way? Hmm
 
 namespace cpplox {
 
@@ -25,6 +27,7 @@ class StatementIf;
 class StatementWhile;
 class StatementFunction;
 class StatementReturn;
+class StatementClass;
 
 class ExpressionBinary;
 class ExpressionLogical;
@@ -34,6 +37,9 @@ class ExpressionUnary;
 class ExpressionVariable;
 class ExpressionAssignment;
 class ExpressionCall;
+class ExpressionGet;
+class ExpressionSet;
+class ExpressionThis;
 
 class IStatement {
 public:
@@ -53,6 +59,7 @@ public:
     virtual void Visit(StatementWhile*) = 0;
     virtual void Visit(StatementFunction*) = 0;
     virtual void Visit(StatementReturn*) = 0;
+    virtual void Visit(StatementClass*) = 0;
 
     virtual ~IStatementVisitor() = default;
 };
@@ -75,6 +82,9 @@ public:
     virtual void Visit(ExpressionVariable*) = 0;
     virtual void Visit(ExpressionAssignment*) = 0;
     virtual void Visit(ExpressionCall*) = 0;
+    virtual void Visit(ExpressionGet*) = 0;
+    virtual void Visit(ExpressionSet*) = 0;
+    virtual void Visit(ExpressionThis*) = 0;
 
     virtual ~IExpressionVisitor() = default;
 };
@@ -111,8 +121,8 @@ public:
 
 class StatementVariable final : public IStatement {
 public:
-    StatementVariable(std::unique_ptr<Token> name, std::unique_ptr<IExpression> initializer = nullptr)
-        : mName { std::move(name) }
+    StatementVariable(const std::string& name, std::unique_ptr<IExpression> initializer = nullptr)
+        : mName { name }
         , mInitializer { std::move(initializer) }
     {
     }
@@ -122,7 +132,7 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Token> mName;
+    const std::string mName;
     std::unique_ptr<IExpression> mInitializer;
 };
 
@@ -181,10 +191,10 @@ public:
 
 class StatementFunction final : public IStatement {
 public:
-    StatementFunction(std::unique_ptr<Token> identifier, std::vector<std::unique_ptr<Token>> parameters,
+    StatementFunction(const std::string& identifier, std::vector<std::string> parameters,
         std::vector<std::unique_ptr<IStatement>> body)
-        : mIdentifier { std::move(identifier) }
-        , mParameters { std::move(parameters) }
+        : mIdentifier { identifier }
+        , mParameters { parameters }
         , mBody { std::move(body) }
     {
     }
@@ -194,8 +204,8 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Token> mIdentifier;
-    std::vector<std::unique_ptr<Token>> mParameters;
+    const std::string mIdentifier;
+    std::vector<std::string> mParameters;
     std::vector<std::unique_ptr<IStatement>> mBody;
 };
 
@@ -219,11 +229,28 @@ public:
     std::unique_ptr<IExpression> mExpression;
 };
 
+class StatementClass final : public IStatement {
+public:
+    StatementClass(const std::string& identifier, std::vector<std::unique_ptr<IStatement>> methods)
+        : mIdentifier { identifier }
+        , mMethods { std::move(methods) }
+    {
+    }
+
+    void Accept(IStatementVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    const std::string mIdentifier;
+    std::vector<std::unique_ptr<IStatement>> mMethods;
+};
+
 class ExpressionBinary final : public IExpression {
 public:
-    ExpressionBinary(std::unique_ptr<IExpression> left, std::unique_ptr<Token> op, std::unique_ptr<IExpression> right)
+    ExpressionBinary(std::unique_ptr<IExpression> left, const Token::Type op, std::unique_ptr<IExpression> right)
         : mLeft { std::move(left) }
-        , mOperator { std::move(op) }
+        , mOperator { op }
         , mRight { std::move(right) }
     {
     }
@@ -234,15 +261,15 @@ public:
     }
 
     std::unique_ptr<IExpression> mLeft;
-    std::unique_ptr<Token> mOperator;
+    const Token::Type mOperator;
     std::unique_ptr<IExpression> mRight;
 };
 
 class ExpressionLogical final : public IExpression {
 public:
-    ExpressionLogical(std::unique_ptr<IExpression> left, std::unique_ptr<Token> op, std::unique_ptr<IExpression> right)
+    ExpressionLogical(std::unique_ptr<IExpression> left, const Token::Type op, std::unique_ptr<IExpression> right)
         : mLeft { std::move(left) }
-        , mOperator { std::move(op) }
+        , mOperator { op }
         , mRight { std::move(right) }
     {
     }
@@ -253,7 +280,7 @@ public:
     }
 
     std::unique_ptr<IExpression> mLeft, mRight;
-    std::unique_ptr<Token> mOperator;
+    const Token::Type mOperator;
 };
 
 class ExpressionGrouping final : public IExpression {
@@ -288,8 +315,8 @@ public:
 
 class ExpressionUnary final : public IExpression {
 public:
-    ExpressionUnary(std::unique_ptr<Token> op, std::unique_ptr<IExpression> expression)
-        : mOperator { std::move(op) }
+    ExpressionUnary(const Token::Type op, std::unique_ptr<IExpression> expression)
+        : mOperator { op }
         , mExpression { std::move(expression) }
     {
     }
@@ -299,14 +326,14 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Token> mOperator;
+    const Token::Type mOperator;
     std::unique_ptr<IExpression> mExpression;
 };
 
 class ExpressionVariable final : public IExpression {
 public:
-    ExpressionVariable(std::unique_ptr<Token> name)
-        : mName { std::move(name) }
+    ExpressionVariable(const std::string& name)
+        : mName { name }
     {
     }
 
@@ -315,13 +342,13 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Token> mName;
+    const std::string mName;
 };
 
 class ExpressionAssignment final : public IExpression {
 public:
-    ExpressionAssignment(std::unique_ptr<Token> name, std::unique_ptr<IExpression> value)
-        : mName { std::move(name) }
+    ExpressionAssignment(const std::string& name, std::unique_ptr<IExpression> value)
+        : mName { name }
         , mValue { std::move(value) }
     {
     }
@@ -331,7 +358,7 @@ public:
         visitor->Visit(this);
     }
 
-    std::unique_ptr<Token> mName;
+    const std::string mName;
     std::unique_ptr<IExpression> mValue;
 };
 
@@ -350,6 +377,53 @@ public:
 
     std::unique_ptr<IExpression> mCallee;
     std::vector<std::unique_ptr<IExpression>> mArguments;
+};
+
+class ExpressionGet final : public IExpression {
+public:
+    ExpressionGet(std::unique_ptr<IExpression> object, const std::string& name)
+        : mObject { std::move(object) }
+        , mName { name }
+    {
+    }
+
+    void Accept(IExpressionVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mObject;
+    const std::string mName;
+};
+
+class ExpressionSet final : public IExpression {
+public:
+    ExpressionSet(std::unique_ptr<IExpression> object, const std::string& name,
+        std::unique_ptr<IExpression> value)
+        : mObject { std::move(object) }
+        , mName { name }
+        , mValue { std::move(value) }
+    {
+    }
+
+    void Accept(IExpressionVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
+
+    std::unique_ptr<IExpression> mObject;
+    const std::string mName;
+    std::unique_ptr<IExpression> mValue;
+};
+
+class ExpressionThis final : public IExpression {
+public:
+    ExpressionThis() = default;
+
+    void Accept(IExpressionVisitor* visitor) override
+    {
+        visitor->Visit(this);
+    }
 };
 
 }

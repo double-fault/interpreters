@@ -18,9 +18,9 @@ Parser::Parser(const std::vector<Token>& tokens)
     mTokens.pop_back(); // Get rid of EOF token
 }
 
-std::vector<std::shared_ptr<IStatement>> Parser::Parse()
+std::vector<std::unique_ptr<IStatement>> Parser::Parse()
 {
-    std::vector<std::shared_ptr<IStatement>> statements;
+    std::vector<std::unique_ptr<IStatement>> statements;
     while (mIterator != mTokens.end()) {
         statements.push_back(Declaration());
     }
@@ -36,25 +36,28 @@ std::unique_ptr<IStatement> Parser::Declaration()
     } else if (Match({ Token::Type::kFun })) {
         Next();
         return DeclarationFunction();
+    } else if (Match({ Token::Type::kClass })) {
+        Next();
+        return DeclarationClass();
     }
     return Statement();
 }
 
 std::unique_ptr<IStatement> Parser::DeclarationFunction()
 {
-    std::unique_ptr<Token> identifier = std::make_unique<Token>(*Peek());
-    Next();
-
-    if (identifier->mType != Token::Type::kIdentifier) {
+    if (!Match({ Token::Type::kIdentifier })) {
         throw ParserException("Expected identifier name after keyword fun");
     }
+
+    const std::string identifier { Peek()->mLexeme };
+    Next();
 
     if (!Match({ Token::Type::kLeftParen })) {
         throw ParserException("Expected left parentheses after function name");
     }
     Next();
 
-    std::vector<std::unique_ptr<Token>> parameters;
+    std::vector<std::string> parameters;
     if (Match({ Token::Type::kRightParen })) {
         Next();
     } else {
@@ -63,7 +66,7 @@ std::unique_ptr<IStatement> Parser::DeclarationFunction()
                 throw ParserException("Function parameters should be identifiers");
             }
 
-            parameters.push_back(std::make_unique<Token>(*Peek()));
+            parameters.push_back(Peek()->mLexeme);
             Next();
 
             if (Match({ Token::Type::kRightParen })) {
@@ -88,7 +91,31 @@ std::unique_ptr<IStatement> Parser::DeclarationFunction()
     }
     Next();
 
-    return std::make_unique<StatementFunction>(std::move(identifier), std::move(parameters), std::move(body));
+    return std::make_unique<StatementFunction>(identifier, parameters, std::move(body));
+}
+
+std::unique_ptr<IStatement> Parser::DeclarationClass()
+{
+    if (!Match({ Token::Type::kIdentifier })) {
+        throw ParserException("Expected identifier name after keyword class");
+    }
+
+    const std::string identifier { Peek()->mLexeme };
+    Next();
+
+    if (!Match({ Token::Type::kLeftBrace })) {
+        throw ParserException("Expected '{' after class identifier");
+    }
+    Next();
+
+    std::vector<std::unique_ptr<IStatement>> methods;
+
+    while (!Match({ Token::Type::kRightBrace })) {
+        methods.push_back(DeclarationFunction());
+    }
+    Next();
+
+    return std::make_unique<StatementClass>(identifier, std::move(methods));
 }
 
 std::unique_ptr<IStatement> Parser::DeclarationVariable()
@@ -96,7 +123,7 @@ std::unique_ptr<IStatement> Parser::DeclarationVariable()
     if (!Match({ Token::Type::kIdentifier })) {
         throw ParserException("Expected variable name");
     }
-    std::unique_ptr<Token> name = std::make_unique<Token>(*Peek());
+    const std::string name { Peek()->mLexeme };
     Next();
 
     std::unique_ptr<IExpression> initializer { nullptr };
@@ -109,7 +136,7 @@ std::unique_ptr<IStatement> Parser::DeclarationVariable()
         throw ParserException("Expected semicolon after variable declaration");
     }
     Next();
-    return std::make_unique<StatementVariable>(std::move(name), std::move(initializer));
+    return std::make_unique<StatementVariable>(name, std::move(initializer));
 }
 
 std::unique_ptr<IStatement> Parser::Statement()
@@ -312,12 +339,18 @@ std::unique_ptr<IExpression> Parser::Assignment()
     if (Match({ Token::Type::kEqual })) {
         Next();
 
+        ExpressionGet* get = dynamic_cast<ExpressionGet*>(expression.get());
+        if (get != nullptr) {
+            return std::make_unique<ExpressionSet>(std::move(get->mObject),
+                get->mName, Assignment());
+        }
+
         ExpressionVariable* variable = dynamic_cast<ExpressionVariable*>(expression.get());
         if (variable == nullptr) {
             throw ParserException("Invalid assignment target");
         }
 
-        return std::make_unique<ExpressionAssignment>(std::move(variable->mName), Assignment());
+        return std::make_unique<ExpressionAssignment>(variable->mName, Assignment());
     }
     return expression;
 }
@@ -327,12 +360,12 @@ std::unique_ptr<IExpression> Parser::LogicalOr()
     std::unique_ptr<IExpression> left = LogicalAnd();
 
     if (Match({ Token::Type::kOr })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
 
         std::unique_ptr<IExpression> right = Equality();
 
-        return std::make_unique<ExpressionLogical>(std::move(left), std::move(op), std::move(right));
+        return std::make_unique<ExpressionLogical>(std::move(left), op, std::move(right));
     }
     return left;
 }
@@ -342,12 +375,12 @@ std::unique_ptr<IExpression> Parser::LogicalAnd()
     std::unique_ptr<IExpression> left = Equality();
 
     if (Match({ Token::Type::kAnd })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
 
         std::unique_ptr<IExpression> right = Equality();
 
-        return std::make_unique<ExpressionLogical>(std::move(left), std::move(op), std::move(right));
+        return std::make_unique<ExpressionLogical>(std::move(left), op, std::move(right));
     }
     return left;
 }
@@ -357,10 +390,9 @@ std::unique_ptr<IExpression> Parser::Equality()
     std::unique_ptr<IExpression> expression = Comparison();
 
     while (Match({ Token::Type::kBangEqual, Token::Type::kEqualEqual })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
-        expression = std::make_unique<ExpressionBinary>(std::move(expression),
-            std::move(op), Comparison());
+        expression = std::make_unique<ExpressionBinary>(std::move(expression), op, Comparison());
     }
     return expression;
 }
@@ -371,9 +403,9 @@ std::unique_ptr<IExpression> Parser::Comparison()
 
     while (Match({ Token::Type::kLess, Token::Type::kLessEqual,
         Token::Type::kGreater, Token::Type::kGreaterEqual })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
-        expression = std::make_unique<ExpressionBinary>(std::move(expression), std::move(op), Term());
+        expression = std::make_unique<ExpressionBinary>(std::move(expression), op, Term());
     }
     return expression;
 }
@@ -383,9 +415,9 @@ std::unique_ptr<IExpression> Parser::Term()
     std::unique_ptr<IExpression> expression = Factor();
 
     while (Match({ Token::Type::kPlus, Token::Type::kMinus })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
-        expression = std::make_unique<ExpressionBinary>(std::move(expression), std::move(op), Factor());
+        expression = std::make_unique<ExpressionBinary>(std::move(expression), op, Factor());
     }
     return expression;
 }
@@ -395,9 +427,9 @@ std::unique_ptr<IExpression> Parser::Factor()
     std::unique_ptr<IExpression> expression = Unary();
 
     while (Match({ Token::Type::kStar, Token::Type::kSlash })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
-        expression = std::make_unique<ExpressionBinary>(std::move(expression), std::move(op), Unary());
+        expression = std::make_unique<ExpressionBinary>(std::move(expression), op, Unary());
     }
     return expression;
 }
@@ -405,9 +437,9 @@ std::unique_ptr<IExpression> Parser::Factor()
 std::unique_ptr<IExpression> Parser::Unary()
 {
     if (Match({ Token::Type::kMinus, Token::Type::kBang })) {
-        std::unique_ptr<Token> op { std::make_unique<Token>(*Peek()) };
+        const Token::Type op { Peek()->mType };
         Next();
-        return std::make_unique<ExpressionUnary>(std::move(op), Unary());
+        return std::make_unique<ExpressionUnary>(op, Unary());
     }
     return Call();
 }
@@ -416,27 +448,42 @@ std::unique_ptr<IExpression> Parser::Call()
 {
     std::unique_ptr<IExpression> expression = Primary();
 
-    while (Match({ Token::Type::kLeftParen })) {
-        std::vector<std::unique_ptr<IExpression>> arguments;
+    for (;;) {
+        if (Match({ Token::Type::kLeftParen })) {
+            std::vector<std::unique_ptr<IExpression>> arguments;
 
-        do {
+            do {
+                Next();
+                if (Match({ Token::Type::kRightParen }))
+                    break;
+
+                arguments.push_back(Expression());
+            } while (Match({ Token::Type::kComma }));
+
+            if (!Match({ Token::Type::kRightParen })) {
+                throw ParserException("Expected ) after arguments");
+            }
             Next();
-            if (Match({ Token::Type::kRightParen }))
-                break;
 
-            arguments.push_back(Expression());
-        } while (Match({ Token::Type::kComma }));
+            if (arguments.size() > 255) {
+                throw ParserException("Cannot have more than 255 arguments");
+            }
 
-        if (!Match({ Token::Type::kRightParen })) {
-            throw ParserException("Expected ) after arguments");
+            expression = std::make_unique<ExpressionCall>(std::move(expression), std::move(arguments));
+        } else if (Match({ Token::Type::kDot })) {
+            Next();
+
+            if (!Match({ Token::Type::kIdentifier })) {
+                throw ParserException("Expected property name after '.'");
+            }
+
+            const std::string name { Peek()->mLexeme };
+            Next();
+
+            expression = std::make_unique<ExpressionGet>(std::move(expression), name);
+        } else {
+            break;
         }
-        Next();
-
-        if (arguments.size() > 255) {
-            throw ParserException("Cannot have more than 255 arguments");
-        }
-
-        expression = std::make_unique<ExpressionCall>(std::move(expression), std::move(arguments));
     }
 
     return expression;
@@ -475,11 +522,19 @@ std::unique_ptr<IExpression> Parser::Primary()
         return std::make_unique<ExpressionGrouping>(std::move(expression));
     }
 
+    if (Match({ Token::Type::kThis })) {
+        Next();
+        return std::make_unique<ExpressionThis>();
+    }
+
     if (Match({ Token::Type::kIdentifier })) {
-        std::unique_ptr<IExpression> expression = std::make_unique<ExpressionVariable>(
-            std::make_unique<Token>(*Peek()));
+        std::unique_ptr<IExpression> expression = std::make_unique<ExpressionVariable>(Peek()->mLexeme);
         Next();
         return expression;
+    }
+
+    if (mIterator == mTokens.end()) {
+        throw ParserException("Reached end of code prematurely");
     }
 
     throw ParserException("Unknown token encountered by parser");

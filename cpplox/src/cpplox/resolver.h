@@ -3,8 +3,6 @@
 #include "ast.h"
 #include "interpreter.h"
 
-#include <memory>
-
 namespace cpplox {
 
 class ResolverException final : public std::runtime_error {
@@ -21,10 +19,17 @@ class Resolver final : public IExpressionVisitor,
 public:
     enum class FunctionType {
         kNone = 0,
-        kFunction
+        kFunction,
+        kMethod,
+        kInitializer
     };
 
-    Resolver(Interpreter*, const std::vector<std::shared_ptr<IStatement>>&);
+    enum class ClassType {
+        kNone = 0,
+        kClass
+    };
+
+    Resolver(Interpreter*, const std::vector<IStatement*>&);
     void Resolve();
 
     void Visit(IStatement*) override;
@@ -36,6 +41,7 @@ public:
     void Visit(StatementWhile*) override;
     void Visit(StatementFunction*) override;
     void Visit(StatementReturn*) override;
+    void Visit(StatementClass*) override;
 
     void Visit(IExpression*) override;
     void Visit(ExpressionBinary*) override;
@@ -46,17 +52,21 @@ public:
     void Visit(ExpressionVariable*) override;
     void Visit(ExpressionAssignment*) override;
     void Visit(ExpressionCall*) override;
+    void Visit(ExpressionGet*) override;
+    void Visit(ExpressionSet*) override;
+    void Visit(ExpressionThis*) override;
 
 private:
     void StartScope();
-    void Declare(Token* identifier);
-    void Define(Token* identifier);
+    void Declare(const std::string& name);
+    void Define(const std::string& name);
     void EndScope();
 
     Interpreter* mInterpreter;
-    std::vector<std::shared_ptr<IStatement>> mStatements;
+    std::vector<IStatement*> mStatements;
     std::vector<std::map<std::string, bool>> mScopes {};
     FunctionType mCurrentFunction;
+    ClassType mCurrentClass;
 };
 
 }

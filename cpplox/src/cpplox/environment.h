@@ -3,22 +3,27 @@
 #include "object.h"
 
 #include <map>
+#include <memory>
 
 namespace cpplox {
 
-class Environment {
+class Environment final {
 public:
     Environment();
-    Environment(Environment*);
+    Environment(std::shared_ptr<Environment> enclosingEnvironment);
+
+    ~Environment();
 
     void Define(const std::string& name, const Object& object);
     void Assign(const std::string& name, const Object& object);
-    Object* Get(const std::string& name);
+    Object Get(const std::string& name);
+    void Release();
 
-    Environment* mEnclosingEnvironment { nullptr };
+    std::shared_ptr<Environment> mEnclosingEnvironment { nullptr };
 
 private:
     std::map<std::string, Object> mVariables;
+    bool mReleased;
 };
 
 }
