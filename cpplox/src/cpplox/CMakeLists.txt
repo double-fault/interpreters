@@ -1,4 +1,4 @@
-file(GLOB SOURCES "*.cc")
+file(GLOB SOURCES "cpplox/*.cc")
 
 find_package(Boost REQUIRED)
 

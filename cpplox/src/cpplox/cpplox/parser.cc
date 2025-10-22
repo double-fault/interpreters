@@ -115,7 +115,7 @@ std::unique_ptr<IStatement> Parser::DeclarationClass()
     }
     Next();
 
-    return std::make_unique<StatementClass>(identifier, std::move(methods));
+    return std::make_unique<StatementClass>(identifier, nullptr, std::move(methods));
 }
 
 std::unique_ptr<IStatement> Parser::DeclarationVariable()

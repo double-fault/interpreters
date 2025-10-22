@@ -231,8 +231,10 @@ public:
 
 class StatementClass final : public IStatement {
 public:
-    StatementClass(const std::string& identifier, std::vector<std::unique_ptr<IStatement>> methods)
+    StatementClass(const std::string& identifier, std::unique_ptr<IExpression> superclass,
+        std::vector<std::unique_ptr<IStatement>> methods)
         : mIdentifier { identifier }
+        , mSuperclass { std::move(superclass) }
         , mMethods { std::move(methods) }
     {
     }
@@ -243,6 +245,7 @@ public:
     }
 
     const std::string mIdentifier;
+    std::unique_ptr<IExpression> mSuperclass;
     std::vector<std::unique_ptr<IStatement>> mMethods;
 };
 

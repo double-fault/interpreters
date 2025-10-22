@@ -1,6 +1,5 @@
-#include "spdlog/common.h"
-#include <error_reporter.h>
-#include <runner.h>
+#include <cpplox/error_reporter.h>
+#include <cpplox/runner.h>
 
 #include <spdlog/spdlog.h>
 

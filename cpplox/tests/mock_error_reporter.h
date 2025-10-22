@@ -1,10 +1,10 @@
 #pragma once
 
 #include "gmock/gmock.h"
-#include <ierror_reporter.h>
+#include <cpplox/ierror_reporter.h>
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 namespace cpploxTests {
 
@@ -15,4 +15,3 @@ public:
 };
 
 }
-

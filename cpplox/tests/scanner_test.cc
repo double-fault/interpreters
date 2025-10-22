@@ -1,7 +1,9 @@
 #include "mock_error_reporter.h"
-#include "scanner.h"
-#include "token.h"
-#include "gmock/gmock.h"
+
+#include <cpplox/scanner.h>
+#include <cpplox/token.h>
+
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <vector>
 
@@ -73,7 +75,7 @@ TEST_F(ScannerTest, NumberLiterals)
 
 TEST_F(ScannerTest, Identifiers)
 {
-    std::string source { "and1 _abcd for_nil while23_ "};
+    std::string source { "and1 _abcd for_nil while23_ " };
 
     cpplox::Scanner scanner(source, &mErrorReporter);
     std::vector<cpplox::Token> tokens = scanner.ScanTokens();
@@ -150,7 +152,7 @@ TEST_F(ScannerTest, Tokens)
     EXPECT_EQ(tokens[20].mType, Type::kEof);
 }
 
-TEST_F(ScannerTest, MixedTokens) 
+TEST_F(ScannerTest, MixedTokens)
 {
     std::string source { "print var a= -1234.12+nil*for_nil3/0" };
 
@@ -164,7 +166,7 @@ TEST_F(ScannerTest, MixedTokens)
     EXPECT_EQ(tokens[0].mType, Type::kPrint);
 
     EXPECT_EQ(tokens[1].mType, Type::kVar);
-    
+
     EXPECT_EQ(tokens[2].mType, Type::kIdentifier);
     ASSERT_TRUE(tokens[2].mObject.has_value());
     EXPECT_EQ(std::get<std::string>(tokens[2].mObject->mData), "a");
@@ -174,7 +176,7 @@ TEST_F(ScannerTest, MixedTokens)
         EXPECT_EQ(tokens[idx].mType, Type::kNumber);
         ASSERT_TRUE(tokens[idx].mObject.has_value());
         EXPECT_NEAR(std::get<double>(tokens[idx].mObject->mData), number, kEps);
-    }};
+    } };
 
     EXPECT_EQ(tokens[4].mType, Type::kMinus);
     compareNumber(5, 1234.12);
