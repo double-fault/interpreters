@@ -9,6 +9,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_FLAGS "-O3")
 
+add_subdirectory(spdlog)
+add_subdirectory(fmt)
+add_subdirectory(googletest)
+add_subdirectory(magic_enum)
+
 add_subdirectory(libs/ir)
 add_subdirectory(libs/compiler)
 add_subdirectory(libs/vm)
