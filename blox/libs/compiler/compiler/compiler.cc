@@ -6,6 +6,7 @@
 #include <ir/ierror_reporter.h>
 #include <ir/ir.h>
 #include <magic_enum/magic_enum.hpp>
+#include <spdlog/spdlog.h>
 
 namespace compiler {
 
@@ -56,7 +57,7 @@ Compiler::Compiler(std::string_view source, ir::IErrorReporter* errorReporter)
         { T::kOr, nullptr, nullptr, P::kNone },
         { T::kPlus, nullptr, &C::Binary, P::kTerm },
         { T::kPrint, nullptr, nullptr, P::kNone },
-        { T::kReturn, nullptr, nullptr, P::kNone },
+        { T::kReturn, &C::Return, nullptr, P::kNone },
         { T::kRightBrace, nullptr, nullptr, P::kNone },
         { T::kRightParen, nullptr, nullptr, P::kNone },
         { T::kSemicolon, nullptr, nullptr, P::kNone },
@@ -82,6 +83,8 @@ Compiler::Compiler(std::string_view source, ir::IErrorReporter* errorReporter)
 
 std::unique_ptr<ir::ObjectFunction> Compiler::Compile()
 {
+    spdlog::info("compiling..");
+
     Expression();
 
     Token eof = mScanner.ScanToken();
@@ -108,10 +111,11 @@ void Compiler::ParseWithPrecedence(Precedence minPrecedence)
     rule.mPrefix(token);
 
     for (;;) {
-        Token infix = mScanner.ScanToken();
+        Token infix = mScanner.PeekToken();
         ParseRule infixRule { GetRule(infix) };
-        if (infixRule.mInfix == nullptr || infixRule.mPrecedence < minPrecedence)
+        if (infixRule.mInfix == nullptr || infixRule.mPrecedence <= minPrecedence)
             break;
+        mScanner.ScanToken();
 
         infixRule.mInfix(infix);
     }
@@ -177,6 +181,11 @@ void Compiler::Grouping(Token token)
     if (end.mType != Token::Type::kRightParen) {
         mErrorReporter->Report(token.mLine, "Expected ')' at end of grouping");
     }
+}
+
+void Compiler::Return(Token token)
+{
+    // TODO
 }
 
 Compiler::ParseRule Compiler::GetRule(Token token)

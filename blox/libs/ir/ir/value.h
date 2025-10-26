@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <fmt/ostream.h>
 
 namespace ir {
 
@@ -39,3 +39,6 @@ public:
 };
 
 }
+
+template <>
+struct fmt::formatter<ir::Value> : ostream_formatter { };

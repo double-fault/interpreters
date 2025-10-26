@@ -24,15 +24,17 @@ public:
     uint8_t AddConstant(bool boolean);
     // TODO: AddConstant functions for string, objects needed?
 
+    Value GetConstant(int index) const;
+
+    void Print() const;
     std::string ToString() const;
     friend std::ostream& operator<<(std::ostream& out, const Chunk& chunk);
 
-    // TODO: Functions to read chunk?
-
-private:
     std::vector<uint8_t> mBytecode;
     std::vector<int> mLines;
     std::vector<Value> mConstants;
+
+private:
     std::vector<std::shared_ptr<Object>> mSavedObjects;
 };
 

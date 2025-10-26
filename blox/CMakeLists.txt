@@ -9,8 +9,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_FLAGS "-O3")
 
-add_subdirectory(spdlog)
 add_subdirectory(fmt)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(SPDLOG_FMT_EXTERNAL ON)
+add_subdirectory(spdlog)
 add_subdirectory(googletest)
 add_subdirectory(magic_enum)
 

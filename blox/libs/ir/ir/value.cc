@@ -52,6 +52,8 @@ std::string Value::ToString() const
         spdlog::error("Value type enum is kError!");
         exit(1);
     }
+    // gcc gives a warning, but clangd does not
+    return std::string {};
 }
 
 std::ostream& operator<<(std::ostream& out, const Value& value)

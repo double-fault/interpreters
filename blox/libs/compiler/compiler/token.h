@@ -84,9 +84,9 @@ public:
     std::string ToString() const;
     friend std::ostream& operator<<(std::ostream& out, const Token& token);
 
-    const Type mType;
-    const std::string_view mLexeme;
-    const int mLine;
+    Type mType;
+    std::string_view mLexeme;
+    int mLine;
 };
 
 }

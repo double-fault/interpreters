@@ -49,6 +49,7 @@ private:
     void Unary(Token);
     void Binary(Token);
     void Grouping(Token);
+    void Return(Token);
 
     ParseRule GetRule(Token token);
 

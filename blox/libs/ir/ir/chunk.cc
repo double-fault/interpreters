@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <fmt/format.h>
 #include <initializer_list>
+#include <magic_enum/magic_enum.hpp>
 #include <ostream>
+#include <spdlog/spdlog.h>
 
 namespace ir {
 
@@ -49,6 +51,43 @@ uint8_t Chunk::AddConstant(double number)
 uint8_t Chunk::AddConstant(bool boolean)
 {
     return AddConstant(Value(boolean), nullptr);
+}
+
+Value Chunk::GetConstant(int index) const
+{
+    return mConstants[index];
+}
+
+void Chunk::Print() const
+{
+    std::string toPrint { fmt::format("== {} ==", ToString()) };
+    int line { -1 };
+
+    for (int index { 0 }; index < mBytecode.size(); index++) {
+        toPrint += "\n";
+        std::string lineString { "|" };
+        if (mLines[index] != line) {
+            line = mLines[index];
+            lineString = std::to_string(line);
+        }
+
+        toPrint += fmt::format("{:04d} {:>4} ", index, lineString);
+
+        ir::Opcode opcode { static_cast<ir::Opcode>(mBytecode[index]) };
+        toPrint += fmt::format("{:<16}", magic_enum::enum_name(opcode));
+
+        switch (opcode) {
+        case ir::Opcode::kConstant: {
+            index++;
+            int constantIndex { mBytecode[index] };
+            toPrint += fmt::format("{:>4} '{}'", constantIndex, GetConstant(constantIndex));
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    spdlog::debug(toPrint);
 }
 
 std::string Chunk::ToString() const

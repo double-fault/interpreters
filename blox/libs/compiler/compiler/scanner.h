@@ -11,6 +11,7 @@ namespace compiler {
 class Scanner final {
 public:
     Scanner(std::string_view source, ir::IErrorReporter* errorReporter);
+    Token PeekToken();
     Token ScanToken();
 
 private:
@@ -29,6 +30,7 @@ private:
     int mLexemeStart { 0 };
     int mCurrentCharacter { 0 };
     int mLine { 1 };
+    std::optional<Token> mPeekedToken;
 
     const std::string mSource;
     ir::IErrorReporter* mErrorReporter;

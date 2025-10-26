@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string_view>
+#include <string>
 
 namespace ir {
 
@@ -13,7 +13,7 @@ public:
      */
     virtual void SetPanic() = 0;
     virtual void ResetPanic() = 0;
-    virtual void Report(int line, std::string_view message) = 0;
+    virtual void Report(int line, const std::string& message) = 0;
     virtual bool HadErrors() = 0;
 
     virtual ~IErrorReporter() = default;

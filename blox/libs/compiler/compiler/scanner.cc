@@ -14,8 +14,23 @@ Scanner::Scanner(std::string_view source, ir::IErrorReporter* errorReporter)
 {
 }
 
+Token Scanner::PeekToken()
+{
+    if (mPeekedToken != std::nullopt) {
+        return mPeekedToken.value();
+    }
+    mPeekedToken = ScanToken();
+    return mPeekedToken.value();
+}
+
 Token Scanner::ScanToken()
 {
+    if (mPeekedToken != std::nullopt) {
+        Token token { mPeekedToken.value() };
+        mPeekedToken.reset();
+        return token;
+    }
+
     for (;;) {
         mLexemeStart = mCurrentCharacter;
         if (IsAtEnd()) {

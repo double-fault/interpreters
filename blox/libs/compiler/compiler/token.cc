@@ -6,6 +6,13 @@
 
 namespace compiler {
 
+Token::Token(Type type, const std::string_view lexeme, int line)
+    : mType { type }
+    , mLexeme { lexeme }
+    , mLine { line }
+{
+}
+
 std::string Token::ToString() const
 {
     return fmt::format("token (type={}, lexeme={}, line={})",
