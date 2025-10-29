@@ -11,9 +11,14 @@ std::ostream& operator<<(std::ostream& out, const Object& object)
     return out;
 }
 
+ObjectString::ObjectString(std::string_view string)
+    : mString { string }
+{
+}
+
 std::string ObjectString::ToString() const
 {
-    return fmt::format("<string= {}>", mString);
+    return mString;
 }
 
 ObjectFunction::ObjectFunction(const std::string& name, Type type, const int arity)

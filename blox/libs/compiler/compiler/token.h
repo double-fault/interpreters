@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <map>
 #include <string>
 
@@ -90,3 +92,6 @@ public:
 };
 
 }
+
+template <>
+struct fmt::formatter<compiler::Token> : ostream_formatter { };

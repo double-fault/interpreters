@@ -23,6 +23,8 @@ public:
     Value();
     Value(double number);
     Value(bool boolean);
+    Value(const std::string& string);
+    Value(std::string_view string);
     Value(Object*) = delete;
     Value(ObjectString* string);
     Value(ObjectFunction* function);
@@ -35,6 +37,7 @@ public:
     } mAs;
 
     std::string ToString() const;
+    friend bool operator==(const Value&, const Value&);
     friend std::ostream& operator<<(std::ostream& out, const Value& value);
 };
 

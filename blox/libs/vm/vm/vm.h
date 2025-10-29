@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ir/value.h"
 #include <ir/ierror_reporter.h>
 #include <ir/ir.h>
+#include <map>
 
 namespace vm {
 
@@ -23,18 +23,23 @@ private:
         int mLine;
     };
 
+    void Global(Byte byte);
     void Constant(Byte byte);
     void Negate(Byte byte);
     void Binary(Byte byte);
+    void Print(Byte byte);
 
     // bytecode
     Byte NextByte();
     Byte PeekByte();
     bool HasMoreBytes();
 
+    // value stack
     void Push(ir::Value);
     ir::Value Pop();
     ir::Value Peek(int distance = 0);
+
+    bool IsTrue(ir::Value value);
     bool CheckType(ir::Value::Type, ir::Value, int line);
     bool CheckType(ir::Value::Type, std::initializer_list<ir::Value>, int line);
 
@@ -47,6 +52,7 @@ private:
     std::vector<ir::Value> mValueStack;
     int mStackPointer { 0 };
     std::vector<CallFrame> mCallStack;
+    std::map<std::string, ir::Value> mGlobals;
 };
 
 }

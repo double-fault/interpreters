@@ -37,21 +37,35 @@ private:
     // Too many layers of indirection, does this create a measurable slowdown?
     // (std::bind is being used)
     struct ParseRule {
-        std::function<void(Token)> mPrefix;
-        std::function<void(Token)> mInfix;
+        std::function<void(Precedence minPrecedence)> mPrefix;
+        std::function<void(Precedence minPrecedence)> mInfix;
         Precedence mPrecedence;
     };
 
     // TODO: We want to emit an opcode for EOF?
     void ParseWithPrecedence(Precedence minPrecedence);
-    void Expression();
-    void Number(Token);
-    void Unary(Token);
-    void Binary(Token);
-    void Grouping(Token);
-    void Return(Token);
 
+    void Declaration();
+    void DeclarationVariable();
+    void Statement();
+    void StatementPrint();
+    void StatementExpression();
+    void Expression();
+
+    void Identifier(Precedence);
+    void Number(Precedence);
+    void String(Precedence);
+    void Nil(Precedence);
+    void True(Precedence);
+    void False(Precedence);
+    void Unary(Precedence);
+    void Binary(Precedence);
+    void Grouping(Precedence);
+    void Return(Precedence);
+
+    std::optional<uint8_t> AddIdentifier(Token token);
     ParseRule GetRule(Token token);
+    bool Consume(Token::Type type);
 
     Scanner mScanner;
     ir::IErrorReporter* mErrorReporter;

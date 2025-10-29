@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 
+# TODO: Add a debug mode which has address sanitizer and debug flags, and release with -O3 -NDEBUG
+# (Nah add address sanitizer after implementing GC or else it detects memory leaks :clown:)
 set(CMAKE_CXX_FLAGS "-O3")
 
 add_subdirectory(fmt)

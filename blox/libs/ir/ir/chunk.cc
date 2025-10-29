@@ -30,27 +30,40 @@ void Chunk::AddByte(Opcode opcode, int line)
     AddByte(static_cast<uint8_t>(opcode), line);
 }
 
-uint8_t Chunk::AddConstant(const Value& value, std::shared_ptr<Object> object)
+void Chunk::AddBytes(std::initializer_list<Opcode> opcodes, int line)
+{
+    for (auto& opcode : opcodes) {
+        AddByte(opcode, line);
+    }
+}
+
+uint8_t Chunk::AddConstant(const Value& value)
 {
     int ret = mConstants.size();
     assert(ret < 256);
 
     mConstants.emplace_back(value);
-
-    if (object) {
-        mSavedObjects.emplace_back(object);
-    }
     return ret;
 }
 
 uint8_t Chunk::AddConstant(double number)
 {
-    return AddConstant(Value(number), nullptr);
+    return AddConstant(Value(number));
 }
 
 uint8_t Chunk::AddConstant(bool boolean)
 {
-    return AddConstant(Value(boolean), nullptr);
+    return AddConstant(Value(boolean));
+}
+
+uint8_t Chunk::AddConstant(ObjectString* string)
+{
+    return AddConstant(Value(string));
+}
+
+uint8_t Chunk::AddConstant(ObjectFunction* function)
+{
+    return AddConstant(Value(function));
 }
 
 Value Chunk::GetConstant(int index) const
@@ -77,6 +90,9 @@ void Chunk::Print() const
         toPrint += fmt::format("{:<16}", magic_enum::enum_name(opcode));
 
         switch (opcode) {
+        case ir::Opcode::kGlobalDefine:
+        case ir::Opcode::kGlobalGet:
+        case ir::Opcode::kGlobalSet:
         case ir::Opcode::kConstant: {
             index++;
             int constantIndex { mBytecode[index] };

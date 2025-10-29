@@ -16,8 +16,7 @@ public:
 
 class ObjectString final : public Object {
 public:
-    ObjectString(const std::string& string);
-
+    ObjectString(std::string_view string);
     std::string ToString() const override;
 
     const std::string mString;
@@ -32,7 +31,6 @@ public:
     };
 
     ObjectFunction(const std::string& name, Type type, const int arity);
-
     std::string ToString() const override;
 
     const std::string mName;

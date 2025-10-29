@@ -23,6 +23,18 @@ Value::Value(bool boolean)
     mAs.boolean = boolean;
 }
 
+Value::Value(const std::string& string)
+    : mType { Type::kString }
+{
+    Object* object = new ObjectString(string);
+    mAs.object = object;
+}
+
+Value::Value(std::string_view string)
+    : Value(std::string { string })
+{
+}
+
 Value::Value(ObjectString* string)
     : mType { Type::kString }
 {
@@ -54,6 +66,32 @@ std::string Value::ToString() const
     }
     // gcc gives a warning, but clangd does not
     return std::string {};
+}
+
+bool operator==(const Value& a, const Value& b)
+{
+    if (a.mType != b.mType) {
+        return false;
+    }
+
+    switch (a.mType) {
+    case Value::Type::kNil:
+        return true;
+    case Value::Type::kNumber:
+        return a.mAs.number == b.mAs.number;
+    case Value::Type::kBool:
+        return a.mAs.boolean == b.mAs.boolean;
+    case Value::Type::kString: {
+        ObjectString* x = static_cast<ObjectString*>(a.mAs.object);
+        ObjectString* y = static_cast<ObjectString*>(b.mAs.object);
+        return x->mString == y->mString;
+    }
+    case Value::Type::kFunction:
+        return a.mAs.object == b.mAs.object;
+    default:
+        assert(6 > 9);
+    }
+    return false; // unreachable
 }
 
 std::ostream& operator<<(std::ostream& out, const Value& value)

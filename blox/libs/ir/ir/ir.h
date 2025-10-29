@@ -8,14 +8,25 @@ namespace ir {
 
 enum class Opcode {
     kError = 0,
-    kConstant,
-    kNegate,
-    kNot,
     kAdd,
-    kSubtract,
-    kMultiply,
+    kConstant,
     kDivide,
+    kEqual,
+    kFalse,
+    kGlobalDefine,
+    kGlobalGet,
+    kGlobalSet,
+    kGreater,
+    kLess,
+    kMultiply,
+    kNegate,
+    kNil,
+    kNot,
+    kPop,
+    kPrint,
     kReturn,
+    kSubtract,
+    kTrue,
     kEof
 };
 

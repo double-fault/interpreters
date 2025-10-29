@@ -8,6 +8,7 @@
 
 namespace driver {
 
+// BUG: REPL is broken because VMs (hence variables) dont persist across lines
 bool Driver::Run(std::string_view source)
 {
     std::unique_ptr<ir::IErrorReporter> errorReporter = std::make_unique<ErrorReporter>();

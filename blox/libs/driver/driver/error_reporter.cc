@@ -27,6 +27,7 @@ void ErrorReporter::Report(int line, const std::string& message)
         return;
     }
     mHadErrors = true;
+    mPanic = true;
 
     std::string error {};
 
