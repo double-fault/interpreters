@@ -99,6 +99,11 @@ void Chunk::Print() const
             toPrint += fmt::format("{:>4} '{}'", constantIndex, GetConstant(constantIndex));
             break;
         }
+        case ir::Opcode::kPopn:
+        case ir::Opcode::kLocalSet:
+        case ir::Opcode::kLocalGet:
+            toPrint += fmt::format("{:<4}", mBytecode[++index]);
+            break;
         default:
             break;
         }

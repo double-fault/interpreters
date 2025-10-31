@@ -1,8 +1,7 @@
 #pragma once
 
-#include "compiler/token.h"
-#include "ir/object.h"
 #include "scanner.h"
+#include "token.h"
 
 #include <functional>
 #include <ir/ierror_reporter.h>
@@ -42,6 +41,13 @@ private:
         Precedence mPrecedence;
     };
 
+    struct LocalVariable {
+        std::string_view mName;
+        int mDepth;
+    };
+
+    const static int kLocalVariablesCount { 256 };
+
     // TODO: We want to emit an opcode for EOF?
     void ParseWithPrecedence(Precedence minPrecedence);
 
@@ -50,6 +56,7 @@ private:
     void Statement();
     void StatementPrint();
     void StatementExpression();
+    void StatementBlock();
     void Expression();
 
     void Identifier(Precedence);
@@ -63,6 +70,10 @@ private:
     void Grouping(Precedence);
     void Return(Precedence);
 
+    void BeginScope(Token token);
+    // TODO: Will using an std::optional here cause much of a slowdown?
+    int ResolveLocal(std::string_view name); // -> -1 on failure
+    void EndScope(Token token);
     std::optional<uint8_t> AddIdentifier(Token token);
     ParseRule GetRule(Token token);
     bool Consume(Token::Type type);
@@ -74,6 +85,9 @@ private:
     std::unique_ptr<ir::ObjectFunction> mMain;
     ir::ObjectFunction* mCurrentFunction;
     ir::Chunk* mCurrentChunk;
+
+    std::vector<LocalVariable> mLocals;
+    int mScopeDepth;
 };
 
 }

@@ -24,10 +24,12 @@ private:
     };
 
     void Global(Byte byte);
+    void Local(Byte byte);
     void Constant(Byte byte);
     void Negate(Byte byte);
     void Binary(Byte byte);
     void Print(Byte byte);
+    void Popn(Byte byte);
 
     // bytecode
     Byte NextByte();
@@ -37,7 +39,6 @@ private:
     // value stack
     void Push(ir::Value);
     ir::Value Pop();
-    ir::Value Peek(int distance = 0);
 
     bool IsTrue(ir::Value value);
     bool CheckType(ir::Value::Type, ir::Value, int line);

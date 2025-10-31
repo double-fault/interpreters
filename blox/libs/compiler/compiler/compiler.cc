@@ -1,11 +1,12 @@
 #include "compiler.h"
-#include "ir/object.h"
 #include "token.h"
 
 #include <cassert>
 #include <ir/ierror_reporter.h>
 #include <ir/ir.h>
 #include <magic_enum/magic_enum.hpp>
+#include <numbers>
+#include <ranges>
 #include <spdlog/spdlog.h>
 #include <sys/socket.h>
 
@@ -22,8 +23,10 @@ Compiler::Compiler(std::string_view source, ir::IErrorReporter* errorReporter)
     , mMain { std::make_unique<ir::ObjectFunction>("main", ir::ObjectFunction::Type::kMain, 0) }
     , mCurrentFunction { mMain.get() }
     , mCurrentChunk { &mMain->mChunk }
+    , mScopeDepth { 0 }
 {
     mErrorReporter->SetPrefix("Compiler");
+    mLocals.reserve(kLocalVariablesCount);
 
     struct UnboundRule {
         Token::Type mType;
@@ -160,25 +163,62 @@ void Compiler::DeclarationVariable()
 {
     Token name { mScanner.ScanToken() };
 
-    std::optional<uint8_t> nameOptional { AddIdentifier(name) };
-    if (nameOptional == std::nullopt)
-        return;
-    uint8_t nameIndex { nameOptional.value() };
+    if (mScopeDepth == 0) {
+        // Global
+        std::optional<uint8_t> nameOptional { AddIdentifier(name) };
+        if (nameOptional == std::nullopt)
+            return;
+        uint8_t nameIndex { nameOptional.value() };
 
-    Token equals { mScanner.PeekToken() };
-    if (equals.mType == Token::Type::kEqual) {
-        mScanner.ScanToken();
-        Expression();
+        Token equals { mScanner.PeekToken() };
+        if (equals.mType == Token::Type::kEqual) {
+            mScanner.ScanToken();
+            Expression();
+        } else {
+            mCurrentChunk->AddByte(ir::Opcode::kNil, name.mLine);
+        }
+
+        if (!Consume(Token::Type::kSemicolon)) {
+            return;
+        }
+
+        mCurrentChunk->AddByte(ir::Opcode::kGlobalDefine, name.mLine);
+        mCurrentChunk->AddByte(nameIndex, name.mLine);
     } else {
-        mCurrentChunk->AddByte(ir::Opcode::kNil, name.mLine);
-    }
+        // Local
+        for (auto& local : std::ranges::views::reverse(mLocals)) {
+            if (local.mDepth < mScopeDepth) {
+                break;
+            }
+            if (local.mName == name.mLexeme) {
+                mErrorReporter->Report(name.mLine,
+                    fmt::format("Variable {} already exists in local scope", name.mLexeme));
+                return;
+            }
+        }
 
-    if (!Consume(Token::Type::kSemicolon)) {
-        return;
-    }
+        if (mLocals.size() == kLocalVariablesCount) {
+            mErrorReporter->Report(name.mLine,
+                fmt::format("More than {} local variables cannot be kept in scope",
+                    kLocalVariablesCount));
+        }
 
-    mCurrentChunk->AddByte(ir::Opcode::kGlobalDefine, name.mLine);
-    mCurrentChunk->AddByte(nameIndex, name.mLine);
+        // Shift this code into helpers?
+        mLocals.emplace_back(name.mLexeme, -1);
+        Token equals { mScanner.PeekToken() };
+        if (equals.mType == Token::Type::kEqual) {
+            mScanner.ScanToken();
+            Expression();
+        } else {
+            mCurrentChunk->AddByte(ir::Opcode::kNil, name.mLine);
+        }
+
+        if (!Consume(Token::Type::kSemicolon)) {
+            return;
+        }
+
+        mLocals.back().mDepth = mScopeDepth;
+    }
 }
 
 void Compiler::Statement()
@@ -186,6 +226,8 @@ void Compiler::Statement()
     Token token { mScanner.PeekToken() };
     if (token.mType == Token::Type::kPrint) {
         StatementPrint();
+    } else if (token.mType == Token::Type::kLeftBrace) {
+        StatementBlock();
     } else {
         StatementExpression();
     }
@@ -211,6 +253,22 @@ void Compiler::StatementExpression()
     }
 }
 
+void Compiler::StatementBlock()
+{
+    Token token { mScanner.ScanToken() };
+
+    BeginScope(token);
+
+    Token rightBrace { mScanner.PeekToken() };
+    while (rightBrace.mType != Token::Type::kEof && rightBrace.mType != Token::Type::kRightBrace) {
+        Declaration();
+        rightBrace = mScanner.PeekToken();
+    }
+    Consume(Token::Type::kRightBrace);
+
+    EndScope(rightBrace);
+}
+
 void Compiler::Expression()
 {
     ParseWithPrecedence(Precedence::kAssignment);
@@ -220,20 +278,42 @@ void Compiler::Identifier(Precedence minPrecedence)
 {
     Token token { mScanner.ScanToken() };
 
-    std::optional<uint8_t> identifierOptional { AddIdentifier(token) };
-    if (identifierOptional == std::nullopt)
-        return;
-    uint8_t identifierIndex { identifierOptional.value() };
+    int resolvedLocal { ResolveLocal(token.mLexeme) };
+    if (resolvedLocal == -1) {
+        // Global
+        std::optional<uint8_t> identifierOptional { AddIdentifier(token) };
+        if (identifierOptional == std::nullopt)
+            return;
+        uint8_t identifierIndex { identifierOptional.value() };
 
-    Token equals { mScanner.PeekToken() };
-    if (minPrecedence <= Precedence::kAssignment && equals.mType == Token::Type::kEqual) {
-        mScanner.ScanToken();
-        Expression();
-        mCurrentChunk->AddByte(ir::Opcode::kGlobalSet, token.mLine);
+        Token equals { mScanner.PeekToken() };
+        if (minPrecedence <= Precedence::kAssignment && equals.mType == Token::Type::kEqual) {
+            mScanner.ScanToken();
+            Expression();
+            mCurrentChunk->AddByte(ir::Opcode::kGlobalSet, token.mLine);
+        } else {
+            mCurrentChunk->AddByte(ir::Opcode::kGlobalGet, token.mLine);
+        }
+        mCurrentChunk->AddByte(identifierIndex, token.mLine);
     } else {
-        mCurrentChunk->AddByte(ir::Opcode::kGlobalGet, token.mLine);
+        // Local
+
+        Token equals { mScanner.PeekToken() };
+        if (minPrecedence <= Precedence::kAssignment && equals.mType == Token::Type::kEqual) {
+            mScanner.ScanToken();
+            Expression();
+            mCurrentChunk->AddByte(ir::Opcode::kLocalSet, token.mLine);
+        } else {
+            if (mLocals[resolvedLocal].mDepth == -1) {
+                mErrorReporter->Report(token.mLine,
+                    fmt::format("Cannot use variable {} in its own initializer",
+                        token.mLexeme));
+                return;
+            }
+            mCurrentChunk->AddByte(ir::Opcode::kLocalGet, token.mLine);
+        }
+        mCurrentChunk->AddByte(static_cast<uint8_t>(resolvedLocal), token.mLine);
     }
-    mCurrentChunk->AddByte(identifierIndex, token.mLine);
 }
 
 void Compiler::Number(Precedence minPrecedence)
@@ -348,6 +428,42 @@ void Compiler::Return(Precedence minPrecedence)
 {
     Token token = mScanner.ScanToken();
     // TODO
+}
+
+void Compiler::BeginScope(Token token)
+{
+    mScopeDepth++;
+}
+
+int Compiler::ResolveLocal(std::string_view name)
+{
+    for (int i = mLocals.size() - 1; i >= 0; --i) {
+        if (mLocals[i].mName == name) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void Compiler::EndScope(Token token)
+{
+    if (!mScopeDepth) {
+        spdlog::error("Internal error - cannot end global scope");
+        exit(1);
+    }
+
+    uint8_t poppedCount { 0 };
+    while (!mLocals.empty() && mLocals.back().mDepth == mScopeDepth) {
+        mLocals.pop_back();
+        poppedCount++;
+    }
+
+    if (poppedCount > 0) {
+        mCurrentChunk->AddByte(ir::Opcode::kPopn, token.mLine);
+        mCurrentChunk->AddByte(poppedCount, token.mLine);
+    }
+
+    mScopeDepth--;
 }
 
 std::optional<uint8_t> Compiler::AddIdentifier(Token token)

@@ -9,7 +9,6 @@
 #include <ir/ir.h>
 #include <magic_enum/magic_enum.hpp>
 #include <spdlog/spdlog.h>
-#include <stdexcept>
 
 using namespace ir;
 
@@ -47,6 +46,10 @@ void Vm::Run()
         case Opcode::kGlobalSet:
             Global(byte);
             break;
+        case Opcode::kLocalGet:
+        case Opcode::kLocalSet:
+            Local(byte);
+            break;
         case Opcode::kConstant:
             Constant(byte);
             break;
@@ -80,10 +83,13 @@ void Vm::Run()
         case Opcode::kPop:
             Pop();
             break;
+        case Opcode::kPopn:
+            Popn(byte);
+            break;
         case Opcode::kEof:
             return;
         default:
-            spdlog::error("Interal error - unknown opcode {}",
+            spdlog::error("Internal error - unknown opcode {}",
                 magic_enum::enum_name(opcode));
         }
     }
@@ -91,7 +97,7 @@ void Vm::Run()
 
 void Vm::Global(Byte byte)
 {
-    Opcode opcode = static_cast<Opcode>(byte.mByte);
+    Opcode opcode { static_cast<Opcode>(byte.mByte) };
     uint8_t index { NextByte().mByte };
     ObjectString* name { static_cast<ObjectString*>(mChunk->GetConstant(index).mAs.object) };
 
@@ -100,7 +106,7 @@ void Vm::Global(Byte byte)
         mGlobals[name->mString] = Pop();
         break;
     case Opcode::kGlobalSet:
-        mGlobals[name->mString] = Peek();
+        mGlobals[name->mString] = mValueStack.back();
         break;
     case Opcode::kGlobalGet:
         if (mGlobals.find(name->mString) == mGlobals.end()) {
@@ -111,6 +117,23 @@ void Vm::Global(Byte byte)
         break;
     default:
         assert(10 > 11);
+    }
+}
+
+void Vm::Local(Byte byte)
+{
+    Opcode opcode { static_cast<Opcode>(byte.mByte) };
+    uint8_t index { NextByte().mByte };
+
+    switch (opcode) {
+    case Opcode::kLocalGet:
+        Push(mValueStack[index]);
+        break;
+    case Opcode::kLocalSet:
+        mValueStack[index] = mValueStack.back();
+        break;
+    default:
+        assert(11 > 12);
     }
 }
 
@@ -192,6 +215,14 @@ void Vm::Print(Byte byte)
     std::cout << Pop() << "\n";
 }
 
+void Vm::Popn(Byte byte)
+{
+    uint8_t count { NextByte().mByte };
+    for (uint8_t i = 0; i < count; i++) {
+        Pop();
+    }
+}
+
 Vm::Byte Vm::NextByte()
 {
     assert(HasMoreBytes());
@@ -220,11 +251,6 @@ Value Vm::Pop()
     Value ret { mValueStack[--mStackPointer] };
     mValueStack.pop_back();
     return ret;
-}
-
-Value Vm::Peek(int distance)
-{
-    return mValueStack[mStackPointer - 1 - distance];
 }
 
 bool Vm::IsTrue(Value value)

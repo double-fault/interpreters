@@ -85,6 +85,7 @@ Token Scanner::ScanToken()
             } else {
                 return MakeToken(Token::Type::kSlash);
             }
+            break;
 
         case '"':
             return ScanString();
