@@ -57,6 +57,9 @@ private:
     void StatementPrint();
     void StatementExpression();
     void StatementBlock();
+    void StatementIf();
+    void StatementWhile();
+    void StatementFor();
     void Expression();
 
     void Identifier(Precedence);
@@ -68,12 +71,20 @@ private:
     void Unary(Precedence);
     void Binary(Precedence);
     void Grouping(Precedence);
+    void And(Precedence);
+    void Or(Precedence);
     void Return(Precedence);
 
     void BeginScope(Token token);
     // TODO: Will using an std::optional here cause much of a slowdown?
     int ResolveLocal(std::string_view name); // -> -1 on failure
     void EndScope(Token token);
+
+    int EmitJump(ir::Opcode jump, uint16_t target, int line);
+    int EmitJump(ir::Opcode jump, int line);
+    void PatchJump(int offset, uint16_t target);
+    void PatchJump(int offset);
+
     std::optional<uint8_t> AddIdentifier(Token token);
     ParseRule GetRule(Token token);
     bool Consume(Token::Type type);

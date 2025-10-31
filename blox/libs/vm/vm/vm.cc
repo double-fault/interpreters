@@ -50,6 +50,11 @@ void Vm::Run()
         case Opcode::kLocalSet:
             Local(byte);
             break;
+        case Opcode::kJump:
+        case Opcode::kJumpIfFalse:
+        case Opcode::kJumpIfTrue:
+            Jump(byte);
+            break;
         case Opcode::kConstant:
             Constant(byte);
             break;
@@ -134,6 +139,33 @@ void Vm::Local(Byte byte)
         break;
     default:
         assert(11 > 12);
+    }
+}
+
+void Vm::Jump(Byte byte)
+{
+    Opcode opcode { static_cast<Opcode>(byte.mByte) };
+
+    // Little-endian
+    uint16_t target { NextByte().mByte };
+    target += NextByte().mByte << 8;
+
+    switch (opcode) {
+    case ir::Opcode::kJump:
+        mFrame->mIp = target;
+        break;
+    case ir::Opcode::kJumpIfFalse:
+        if (!IsTrue(mValueStack.back())) {
+            mFrame->mIp = target;
+        }
+        break;
+    case ir::Opcode::kJumpIfTrue:
+        if (IsTrue(mValueStack.back())) {
+            mFrame->mIp = target;
+        }
+        break;
+    default:
+        assert(1 > 2);
     }
 }
 

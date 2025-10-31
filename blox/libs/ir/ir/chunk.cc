@@ -104,6 +104,14 @@ void Chunk::Print() const
         case ir::Opcode::kLocalGet:
             toPrint += fmt::format("{:<4}", mBytecode[++index]);
             break;
+        case ir::Opcode::kJump:
+        case ir::Opcode::kJumpIfTrue:
+        case ir::Opcode::kJumpIfFalse: {
+            uint16_t target { mBytecode[++index] };
+            target += mBytecode[++index] << 8;
+            toPrint += fmt::format("{:<5}", target);
+            break;
+        }
         default:
             break;
         }

@@ -6,6 +6,10 @@
 
 namespace ir {
 
+// NOTE: The jump instructions jump to absolute ips. Switch to relative instead?
+// For real pc ofc relative makes sense, but for this is it worth the effort
+// cos then you'll also have to add instructions for backward jmp (instead of
+// stuffing a signed offset in the bytecode which is even more pain).
 enum class Opcode {
     kError = 0,
     kAdd,
@@ -17,6 +21,9 @@ enum class Opcode {
     kGlobalGet,
     kGlobalSet,
     kGreater,
+    kJump,
+    kJumpIfFalse,
+    kJumpIfTrue,
     kLess,
     kLocalGet,
     kLocalSet,

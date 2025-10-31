@@ -12,6 +12,7 @@ public:
     void Run();
 
 private:
+    // TODO: Switch instruction pointers from int -> uint16_t
     struct CallFrame {
         ir::ObjectFunction* mFunction;
         int mIp;
@@ -25,6 +26,7 @@ private:
 
     void Global(Byte byte);
     void Local(Byte byte);
+    void Jump(Byte byte);
     void Constant(Byte byte);
     void Negate(Byte byte);
     void Binary(Byte byte);

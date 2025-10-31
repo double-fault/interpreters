@@ -2,13 +2,12 @@
 #include "token.h"
 
 #include <cassert>
+#include <cstdint>
 #include <ir/ierror_reporter.h>
 #include <ir/ir.h>
 #include <magic_enum/magic_enum.hpp>
-#include <numbers>
 #include <ranges>
 #include <spdlog/spdlog.h>
-#include <sys/socket.h>
 
 // TODO: There is fuck-all error handling, once again
 // Also note that in the vm if there is an error, it continues to execute?
@@ -39,7 +38,7 @@ Compiler::Compiler(std::string_view source, ir::IErrorReporter* errorReporter)
     using T = Token::Type;
     using P = Precedence;
     const std::vector<UnboundRule> rules { {
-        { T::kAnd, nullptr, nullptr, P::kNone },
+        { T::kAnd, nullptr, &C::And, P::kAnd },
         { T::kBang, &C::Unary, nullptr, P::kNone },
         { T::kBangEqual, nullptr, &C::Binary, P::kEquality },
         { T::kClass, nullptr, nullptr, P::kNone },
@@ -64,7 +63,7 @@ Compiler::Compiler(std::string_view source, ir::IErrorReporter* errorReporter)
         { T::kMinus, &C::Unary, &C::Binary, P::kTerm },
         { T::kNil, &C::Nil, nullptr, P::kNone },
         { T::kNumber, &C::Number, nullptr, P::kNone },
-        { T::kOr, nullptr, nullptr, P::kNone },
+        { T::kOr, nullptr, &C::Or, P::kOr },
         { T::kPlus, nullptr, &C::Binary, P::kTerm },
         { T::kPrint, nullptr, nullptr, P::kNone },
         { T::kReturn, nullptr, nullptr, P::kNone },
@@ -228,6 +227,12 @@ void Compiler::Statement()
         StatementPrint();
     } else if (token.mType == Token::Type::kLeftBrace) {
         StatementBlock();
+    } else if (token.mType == Token::Type::kIf) {
+        StatementIf();
+    } else if (token.mType == Token::Type::kWhile) {
+        StatementWhile();
+    } else if (token.mType == Token::Type::kFor) {
+        StatementFor();
     } else {
         StatementExpression();
     }
@@ -246,11 +251,14 @@ void Compiler::StatementPrint()
 
 void Compiler::StatementExpression()
 {
-    Expression();
-    int line { mScanner.PeekToken().mLine };
-    if (Consume(Token::Type::kSemicolon)) {
-        mCurrentChunk->AddByte(ir::Opcode::kPop, line);
-    }
+    if (mScanner.PeekToken().mType != Token::Type::kSemicolon) {
+        Expression();
+        int line { mScanner.PeekToken().mLine };
+        if (Consume(Token::Type::kSemicolon)) {
+            mCurrentChunk->AddByte(ir::Opcode::kPop, line);
+        }
+    } else
+        mScanner.ScanToken();
 }
 
 void Compiler::StatementBlock()
@@ -267,6 +275,111 @@ void Compiler::StatementBlock()
     Consume(Token::Type::kRightBrace);
 
     EndScope(rightBrace);
+}
+
+void Compiler::StatementIf()
+{
+    Token token { mScanner.ScanToken() };
+
+    if (!Consume(Token::Type::kLeftParen))
+        return;
+    Expression();
+    if (!Consume(Token::Type::kRightParen))
+        return;
+
+    int jumpToElse { EmitJump(ir::Opcode::kJumpIfFalse, token.mLine) };
+
+    // Then
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    Statement();
+    int jumpToEnd { EmitJump(ir::Opcode::kJump, token.mLine) };
+
+    // Else
+    PatchJump(jumpToElse);
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+
+    Token tokenElse { mScanner.PeekToken() };
+    if (tokenElse.mType == Token::Type::kElse) {
+        mScanner.ScanToken();
+        Statement();
+    }
+
+    PatchJump(jumpToEnd);
+}
+
+void Compiler::StatementWhile()
+{
+    Token token { mScanner.ScanToken() };
+
+    if (!Consume(Token::Type::kLeftParen))
+        return;
+    uint16_t loopStart { static_cast<uint16_t>(mCurrentChunk->mBytecode.size()) };
+    Expression();
+    if (!Consume(Token::Type::kRightParen))
+        return;
+
+    int jumpToEnd { EmitJump(ir::Opcode::kJumpIfFalse, token.mLine) };
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    Statement();
+
+    EmitJump(ir::Opcode::kJump, loopStart, token.mLine);
+
+    PatchJump(jumpToEnd);
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+}
+
+void Compiler::StatementFor()
+{
+    Token token { mScanner.ScanToken() };
+
+    if (!Consume(Token::Type::kLeftParen))
+        return;
+
+    BeginScope(token);
+
+    // initializer
+    if (mScanner.PeekToken().mType == Token::Type::kVar) {
+        mScanner.ScanToken();
+        DeclarationVariable();
+    } else {
+        StatementExpression();
+    }
+
+    // condition
+    uint16_t conditionStart { static_cast<uint16_t>(mCurrentChunk->mBytecode.size()) };
+    if (mScanner.PeekToken().mType != Token::Type::kSemicolon) {
+        Expression();
+    } else {
+        mCurrentChunk->AddByte(ir::Opcode::kTrue, token.mLine);
+    }
+    if (!Consume(Token::Type::kSemicolon))
+        return;
+
+    int jumpToEnd { EmitJump(ir::Opcode::kJumpIfFalse, token.mLine) };
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    int jumpToBody { EmitJump(ir::Opcode::kJump, token.mLine) };
+
+    // increment
+    uint16_t incrementStart { static_cast<uint16_t>(mCurrentChunk->mBytecode.size()) };
+    if (mScanner.PeekToken().mType != Token::Type::kRightParen) {
+        Expression();
+        mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    }
+    EmitJump(ir::Opcode::kJump, conditionStart, token.mLine);
+
+    if (!Consume(Token::Type::kRightParen))
+        return;
+
+    // body
+    PatchJump(jumpToBody);
+    Statement();
+    EmitJump(ir::Opcode::kJump, incrementStart, token.mLine);
+
+    // end
+    PatchJump(jumpToEnd);
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+
+    EndScope(token);
 }
 
 void Compiler::Expression()
@@ -424,6 +537,29 @@ void Compiler::Grouping(Precedence minPrecedence)
     }
 }
 
+void Compiler::And(Precedence minPrecedence)
+{
+    Token token { mScanner.ScanToken() };
+
+    int endJump { EmitJump(ir::Opcode::kJumpIfFalse, token.mLine) };
+
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    ParseWithPrecedence(minPrecedence);
+
+    PatchJump(endJump);
+}
+
+void Compiler::Or(Precedence minPrecedence)
+{
+    Token token { mScanner.ScanToken() };
+    int endJump { EmitJump(ir::Opcode::kJumpIfTrue, token.mLine) };
+
+    mCurrentChunk->AddByte(ir::Opcode::kPop, token.mLine);
+    ParseWithPrecedence(minPrecedence);
+
+    PatchJump(endJump);
+}
+
 void Compiler::Return(Precedence minPrecedence)
 {
     Token token = mScanner.ScanToken();
@@ -464,6 +600,34 @@ void Compiler::EndScope(Token token)
     }
 
     mScopeDepth--;
+}
+
+int Compiler::EmitJump(ir::Opcode jump, uint16_t target, int line)
+{
+    mCurrentChunk->AddByte(jump, line);
+    int ret { static_cast<int>(mCurrentChunk->mBytecode.size()) };
+
+    mCurrentChunk->AddByte(target & 0xFF, line);
+    mCurrentChunk->AddByte(target >> 8, line);
+
+    return ret;
+}
+
+int Compiler::EmitJump(ir::Opcode jump, int line)
+{
+    return EmitJump(jump, 0xFFFF, line);
+}
+
+void Compiler::PatchJump(int offset, uint16_t target)
+{
+    // Little-endian
+    mCurrentChunk->mBytecode[offset] = target & 0xFF;
+    mCurrentChunk->mBytecode[offset + 1] = target >> 8;
+}
+
+void Compiler::PatchJump(int offset)
+{
+    PatchJump(offset, mCurrentChunk->mBytecode.size());
 }
 
 std::optional<uint8_t> Compiler::AddIdentifier(Token token)
